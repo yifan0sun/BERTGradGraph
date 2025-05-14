@@ -1,42 +1,107 @@
-#root {
-  max-width: 1280px;
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f8f9fa;
+  color: #333;
+}
+
+input, select, button {
+  font-family: inherit;
+}
+
+h1, h2 {
+  font-weight: 700;
+}
+
+button {
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+button:hover {
+  transform: translateY(-1px);
+}
+
+/* App.css */
+
+.page {
+  min-height: 100vh;
+  font-family: serif;
+  background-color: #f8f9fa;
+  padding: 3rem;
+}
+
+.container {
+  max-width: 900px;
   margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
 }
 
 .card {
-  padding: 2em;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 2.5rem;
+  margin-bottom: 4rem;
 }
 
-.read-the-docs {
-  color: #888;
+.card input[type="text"] {
+  width: 100%;
+  padding: 1.25rem;
+  font-size: 1.1rem;
+  border: 1px solid #ccc;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
+
+.comparison-row {
+  display: flex;
+  overflow-x: auto;
+  gap: 2rem;
+  padding-bottom: 1rem;
+  margin-top: 3rem;
+}
+
+.comparison-box {
+  width: 300px;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+button {
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-right: 1rem;
+}
+
+button.primary {
+  background-color: #2563eb;
+  color: white;
+}
+
+button.primary:hover {
+  background-color: #1e40af;
+}
+
+button.green {
+  background-color: #22c55e;
+  color: white;
+}
+
+button.green:hover {
+  background-color: #15803d;
+}
+
+button.red {
+  background-color: #ef4444;
+  color: white;
+}
+
+button.red:hover {
+  background-color: #b91c1c;
+}
+

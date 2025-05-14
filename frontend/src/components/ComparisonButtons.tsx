@@ -1,8 +1,13 @@
 import React from 'react'
 
-export default function ComparisonButtons({ sentence, layerCount }: { sentence: string; layerCount: number }) {
-
-  const words = sentence.split(' ')
+export default function ComparisonButtons({
+  tokens,
+  layerCount,
+}: {
+  tokens: string[]
+  layerCount: number
+}) {
+const words = tokens
 
   return (
     <div className="flex flex-col gap-4">
@@ -17,7 +22,7 @@ export default function ComparisonButtons({ sentence, layerCount }: { sentence: 
 
 
       {/* Row of buttons for each word in the sentence */}
-      <div className="flex gap-2 flex-wrap justify-center">
+      <div className="flex gap-2 flex-wrap justify-center break-words max-w-full">
         {words.map((word, i) => (
           <button key={i} className="px-2 py-1 bg-blue-200 rounded">
             {word}
