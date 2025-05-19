@@ -61,26 +61,6 @@ def load_model(req: ModelRequest):
         return {"error": f"Tokenization failed: {str(e)}"}
 
     
-    # Run prediction
-    try:
-        pred_token, loss, grads = vis.predict(req.task.lower(), req.sentence)
-    except Exception as e:
-        pred_token, loss,grads = "error", e,"_"
-
-    debug_info = {
-        "prediction": pred_token,
-        "loss": loss,
-        'grads':grads
-    }
-    print(debug_info)
-    # Optionally get attention gradients
-    if req.selected_layer >= 0 and req.selected_token >= 0:
-        try:
-            attn_map, grad_matrix, tokens = vis.get_attention_gradient_matrix(req.task.lower(), req.sentence, req.selected_layer)
-            debug_info["grad_norms"] = grad_matrix.tolist()
-        except Exception as e:
-            debug_info["grad_error"] = str(e)
-
     response = {
         "model": req.model,
         "task": req.task,
@@ -88,7 +68,45 @@ def load_model(req: ModelRequest):
         "num_layers": vis.num_attention_layers,
         "head": "MLM" if req.task == "MLM" and req.model == "BERT" else "DUMMY",
         "mask_token": vis.tokenizer.mask_token,
-        "debug": debug_info
+    }
+    print(response)
+    return response
+
+
+
+
+
+@app.post("/predict_model")
+def predict_model(req: ModelRequest):
+    print(f"\n--- /predict_model request received ---")
+    print(f"Model: {req.model}")
+    print(f"Task: {req.task}")
+    print(f"Sentence: {req.sentence}")
+    print(f"Selected layer: {req.selected_layer}, token: {req.selected_token}")
+
+    vis_class = VISUALIZER_CLASSES.get(req.model)
+    if vis_class is None:
+        return {"error": f"Unknown model: {req.model}"}
+
+    vis = vis_class()
+
+    try:
+        token_output = vis.tokenize(req.sentence)
+    except Exception as e:
+        return {"error": f"Tokenization failed: {str(e)}"}
+
+    
+    # Run prediction
+    try:
+        decoded, top_probs, grads = vis.predict(req.task.lower(), req.sentence)
+    except Exception as e:
+        decoded, top_probs, grads = "error", e,"_"
+
+  
+    response = {
+        "decoded": decoded,
+        "top_probs": top_probs,
+        'grads':grads
     }
     print(response)
     return response

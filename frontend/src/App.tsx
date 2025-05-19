@@ -2,14 +2,11 @@ import React, { useState, useEffect } from 'react'
 import dummyImage from './assets/dummy.png'
 import './App.css'
 
-import ComparisonButtons from './components/ComparisonButtons.tsx'
-import ComparisonDisplay from './components/ComparisonDisplay.tsx'
+import ScenarioCard from './components/ScenarioCard.tsx'
 
 const SERVER_ADDR = "http://localhost:8000/load_model";
 
-function extendList<T>(list: T[], newValue: T): T[] {
-  return [...list, newValue];
-}
+
 
 function maskSentence(original: string, tokenIndex: number, tokens: string[], maskToken: string): string {
   const words = original.split(" ");
@@ -21,38 +18,47 @@ function maskSentence(original: string, tokenIndex: number, tokens: string[], ma
 }
 
 
+
+
 export default function App() {
   const defaultSentence = 'The quick brown fox jumps over the lazy dog.'
   const defaultModel = 'BERT'
   const defaultTask = 'MLM'
 
-  const [sentence, setSentence] = useState(defaultSentence)
-  const [comparisons, setComparisons] = useState([{ model: defaultModel, task: defaultTask, selected: false }])
-  const [results, setResults] = useState([dummyImage])
-  const [layerCounts, setLayerCounts] = useState<number[]>([12]) // dummy: one per comparison
 
-  const [tokensList, setTokensList] = useState<string[][]>(comparisons.map(() => []))
-  const [maskedTokensList, setMaskedTokensList] = useState<string[][]>(
-    comparisons.map(() => [])
-  )
+  const [sentence, setSentence] = useState(defaultSentence);
+  const [tokensList, setTokensList] = useState<string[][]>([[]]);
+  const [comparisons, setComparisons] = useState([{ model: defaultModel, task: defaultTask, selected: false }]);
+  const [results, setResults] = useState([dummyImage]);
+  const [layerCounts, setLayerCounts] = useState<number[]>([12]);
+  const [maskedTokensList, setMaskedTokensList] = useState<string[][]>([[]]);
+  const [predictData, setPredictData] = useState([{ tokens: [], probs: [], grads: [] }]);
+  const [showProbs, setShowProbs] = useState([true]);
+  const [showGrads, setShowGrads] = useState([false]);
+  const [selectedLayers, setSelectedLayers] = useState<number[]>([-1]);
+  const [selectedTokens, setSelectedTokens] = useState<number[]>([-1]);
+  const [selectedMaskTokens, setSelectedMaskTokens] = useState<number[]>([-1]);
+  const [maskTokens, setMaskTokens] = useState<string[]>(['[MASK]']);
   const [removeWarning, setRemoveWarning] = useState(false);
+  const extendList = <T,>(list: T[], newValue: T): T[] => [...list, newValue];
 
-  const [selectedLayers, setSelectedLayers] = useState<number[]>(comparisons.map(() => -1));  // e.g. -1 = none
-  const [selectedTokens, setSelectedTokens] = useState<number[]>(comparisons.map(() => -1));
 
-  const [selectedMaskTokens, setSelectedMaskTokens] = useState<number[]>(comparisons.map(() => -1));
-  const [maskTokens, setMaskTokens] = useState<string[]>(comparisons.map(() => "[MASK]"));
+
 
   const handleLayerSelect = (idx: number, layer: number) => {
     const updated = [...selectedLayers];
     updated[idx] = layer;
     setSelectedLayers(updated);
+
+
   };
-  
+    
   const handleTokenSelect = (idx: number, token: number) => {
     const updated = [...selectedTokens];
     updated[idx] = token;
     setSelectedTokens(updated);
+
+ 
   };
 
   const handleInputChange = (index, key, value) => {
@@ -75,6 +81,31 @@ export default function App() {
 
   }
 
+  const handleMaskToken = (idx, tokenIndex) => {
+    const originalTokens = tokensList[idx];
+    const newTokens = [...originalTokens];
+    const maskedToken = originalTokens[tokenIndex];
+  
+    // Apply the mask
+    newTokens[tokenIndex] = maskTokens[idx];
+    const newSentence = newTokens.join(" ");
+  
+    console.log(`🔍 Masking token "${maskedToken}" at position ${tokenIndex}`);
+    console.log(`📤 Prepared masked sentence: "${newSentence}"`);
+  
+    // Update maskedTokensList only (NOT tokensList)
+    if (comparisons[idx].task === "MLM") {
+      const newMasked = [...maskedTokensList];
+      newMasked[idx] = newTokens;
+      setMaskedTokensList(newMasked);
+    }
+  
+    // Update selectedMaskTokens
+    const newSelectedMasks = [...selectedMaskTokens];
+    newSelectedMasks[idx] = tokenIndex;
+    setSelectedMaskTokens(newSelectedMasks);
+  };
+  
 
   const handleGo = () => {
     setResults(Array(comparisons.length).fill(dummyImage));
@@ -84,20 +115,34 @@ export default function App() {
   
  
 
-  const addComparison = () => {
+const addComparison = () => {
+
+ 
+
+
+  
   if (comparisons.length < 3) {
-    const prev = comparisons[comparisons.length - 1];
+    const prev = comparisons[comparisons.length - 1] || {
+      model: defaultModel,
+      task: defaultTask,
+    };
+
     const newComparison = { model: prev.model, task: prev.task, selected: false };
 
     setComparisons(extendList(comparisons, newComparison));
-    setLayerCounts(extendList(layerCounts, layerCounts[layerCounts.length - 1]));
+    setLayerCounts(extendList(layerCounts, 12));
     setResults(extendList(results, dummyImage));
     setTokensList(extendList(tokensList, []));
     setMaskedTokensList(extendList(maskedTokensList, []));
     setSelectedLayers(extendList(selectedLayers, -1));
     setSelectedTokens(extendList(selectedTokens, -1));
+    setPredictData(extendList(predictData, { tokens: [], probs: [], grads: [] }));
+    setShowProbs(extendList(showProbs, true));
+    setShowGrads(extendList(showGrads, false));
+    setSelectedMaskTokens(extendList(selectedMaskTokens, -1));
+    setMaskTokens(extendList(maskTokens, '[MASK]'));
   }
-}
+};
 
 
 const removeComparison = () => {
@@ -127,84 +172,76 @@ const removeComparison = () => {
   }
 
 
-  const updateBackendInfo = async (comp, idx) => {
-    const isMLM = comp.task === "MLM";
-    const effectiveSentence = isMLM
+ const updateBackendInfo = async (comp, idx) => {
+  const isMLM = comp.task === "MLM";
+  const effectiveSentence = isMLM
     ? maskSentence(sentence, selectedMaskTokens[idx], tokensList[idx], maskTokens[idx])
     : sentence;
-    console.log(`🧠 Sending text to server: "${effectiveSentence}"`);
-  
-    const res = await fetch(SERVER_ADDR, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: comp.model,
-        task: comp.task,
-        sentence: effectiveSentence,
-        selected_layer: selectedLayers[idx],
-        selected_token: selectedTokens[idx],
-      }),
-    });
-  
-    const data = await res.json()
-    
-    console.log("Backend returned:", data);
 
+  console.log(`🧠 Sending text to /load_model: "${effectiveSentence}"`);
 
-    if (!data.error) {
-      const newLayers = [...layerCounts]
-      newLayers[idx] = data.num_layers
-      setLayerCounts(newLayers)
+  const loadRes = await fetch("http://localhost:8000/load_model", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: comp.model,
+      task: comp.task,
+      sentence: effectiveSentence,
+      selected_layer: selectedLayers[idx],
+      selected_token: selectedTokens[idx],
+    }),
+  });
 
-      // Only set tokensList the first time
-      if (tokensList[idx].length === 0) {
-        const newTokens = [...tokensList];
-        newTokens[idx] = data.tokens;
-        setTokensList(newTokens);
-      }
+  const loadData = await loadRes.json();
+  console.log("✅ /load_model returned:", loadData);
 
-      // Always set maskedTokensList for MLM
-      if (comp.task === "MLM") {
-        const newMasked = [...maskedTokensList];
-        newMasked[idx] = data.tokens;
-        setMaskedTokensList(newMasked);
-      }
-      
-      const newMaskTokens = [...maskTokens];
-      newMaskTokens[idx] = data.mask_token || newMaskTokens[idx];
-      setMaskTokens(newMaskTokens);
+  if (!loadData.error) {
+    const newLayers = [...layerCounts];
+    newLayers[idx] = loadData.num_layers;
+    setLayerCounts(newLayers);
+
+    if (tokensList[idx].length === 0) {
+      const newTokens = [...tokensList];
+      newTokens[idx] = loadData.tokens;
+      setTokensList(newTokens);
     }
-  }
-  const handleMaskToken = (idx, tokenIndex) => {
-    const originalTokens = tokensList[idx];
-    const newTokens = [...originalTokens];
-    const maskedToken = originalTokens[tokenIndex];
-  
-    // Apply the mask
-    newTokens[tokenIndex] = maskTokens[idx];
-    const newSentence = newTokens.join(" ");
-  
-    console.log(`🔍 Masking token "${maskedToken}" at position ${tokenIndex}`);
-    console.log(`📤 Prepared masked sentence: "${newSentence}"`);
-  
-    // Update maskedTokensList only (NOT tokensList)
-    if (comparisons[idx].task === "MLM") {
+
+    if (comp.task === "MLM") {
       const newMasked = [...maskedTokensList];
-      newMasked[idx] = newTokens;
+      newMasked[idx] = loadData.tokens;
       setMaskedTokensList(newMasked);
     }
+
+    const newMaskTokens = [...maskTokens];
+    newMaskTokens[idx] = loadData.mask_token || newMaskTokens[idx];
+    setMaskTokens(newMaskTokens);
+  }
+
   
-    // Update selectedMaskTokens
-    const newSelectedMasks = [...selectedMaskTokens];
-    newSelectedMasks[idx] = tokenIndex;
-    setSelectedMaskTokens(newSelectedMasks);
+    const predictRes = await fetch("http://localhost:8000/predict_model", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: comp.model, task: comp.task, sentence: effectiveSentence, selected_layer: selectedLayers[idx], selected_token: selectedTokens[idx] })
+    });
+    const predictJson = await predictRes.json();
+
+    const newPredictData = [...predictData];
+    newPredictData[idx] = {
+      tokens: predictJson.decoded,
+      probs: predictJson.top_probs,
+      grads: predictJson.grads,
+    };
+    setPredictData(newPredictData);
   };
-  
-  
+ 
 
   useEffect(() => {
     setResults(Array(comparisons.length).fill(dummyImage))
   }, [comparisons.length])
+
+ 
+
+
 
 
 
@@ -214,7 +251,16 @@ const removeComparison = () => {
 
         <h1 className="text-2xl font-bold mb-4">Transformers: gradients and graphs</h1>
 
-            <div className="card">
+            <div className="centered-stack">
+              <div
+                className="card input-dynamic-width"
+                style={{
+                  width: comparisons.length === 1
+                    ? '800px'
+                    : `min(${comparisons.length * 820}px, 100vw)`, // estimates card + gap
+                }}
+              >
+
                 <p>
                   Type a sample passage here.    (Best performance if fewer than 500 words.)
                 </p>
@@ -229,69 +275,58 @@ const removeComparison = () => {
               <button className="button" onClick={handleGo}>Apply</button>
               </div>
                 <p></p>
-              </div>
 
+            </div> 
+            <div className="comparison-scroll-container">
 
+              <div style={{ fontSize: '0.8rem', color: '#4b5563', marginTop: '1rem' }}>
+                    <div><strong>Tokens:</strong> {JSON.stringify(predictData[0].tokens)}</div>
+                    <div><strong>Probs:</strong> {JSON.stringify(predictData[0].probs)}</div>
+                    <div><strong>Grads:</strong> {JSON.stringify(predictData[0].grads)}</div>
+                  </div>
               <div className="comparison-row">
                 {comparisons.map((comp, idx) => (
-                  <div key={idx} className="scenario-card">
-                    
+                  
  
-                    <div className="dropdown-row">
-                      <div className="dropdown-group">
-                        <label className="dropdown-label">Pick model</label>
-                        <select value={comp.model} onChange={(e) => handleInputChange(idx, 'model', e.target.value)}>
-                          <option value="">Select Model</option>
-                          <option>BERT</option>
-                          <option>BART</option>
-                          <option>RoBERTa</option>
-                          <option>DistilBERT</option>
-                        </select>
-                      </div>
+                  
 
-                      <div className="dropdown-group">
-                        <label className="dropdown-label">Pick task</label>
-                        <select value={comp.task} onChange={(e) => handleInputChange(idx, 'task', e.target.value)}>
-                          <option value="">Select Task</option>
-                          <option>MLM</option>
-                          <option>NSP</option>
-                          <option>SST2</option>
-                          <option>SQUAD</option>
-                        </select>
-                      </div>
-
-                      <div className="apply-button-container">
-                      <button className="button" onClick={() => updateBackendInfo(comp, idx)}>Apply</button>
-                      </div>
-                    </div>
-
-                    <ComparisonButtons
-                      tokens={tokensList[idx]}
-                      maskedTokens={maskedTokensList[idx]}
-                      layerCount={layerCounts[idx]}
-                      model={comp.model}
-                      task={comp.task}
-                      onMaskToken={(tokenIdx) => handleMaskToken(idx, tokenIdx)}
-                      selectedLayer={selectedLayers[idx]}
-                      selectedToken={selectedTokens[idx]}
-                      onLayerSelect={(layerIdx) => handleLayerSelect(idx, layerIdx)}
-                      onTokenSelect={(tokenIdx) => handleTokenSelect(idx, tokenIdx)}
-                      selectedMaskToken={selectedMaskTokens[idx]} 
-                    />
- 
-                    <ComparisonDisplay
-                      image={results[idx]}
-                      selected={comp.selected}
-                      onToggle={() => toggleSelection(idx)}
-                      showCheckbox={comparisons.length > 1}
-                      label={`Result ${idx + 1}`}
-                    />
-                  </div>
-                ))}
-              </div>
-
-            </div>
-
+                <ScenarioCard
+                  key={idx}
+                  idx={idx}
+                  comparison={comp}
+                  tokens={tokensList[idx]}
+                  maskedTokens={maskedTokensList[idx]}
+                  layerCount={layerCounts[idx]}
+                  selectedLayer={selectedLayers[idx]}
+                  selectedToken={selectedTokens[idx]}
+                  selectedMaskToken={selectedMaskTokens[idx]}
+                  maskToken={maskTokens[idx]}
+                  predict={predictData[idx]}
+                  showProb={showProbs[idx]}
+                  showGrad={showGrads[idx]}
+                  onInputChange={handleInputChange}
+                  onApply={(i) => updateBackendInfo(comparisons[i], i)}
+                  onToggleSelected={toggleSelection}
+                  onLayerSelect={handleLayerSelect}
+                  onTokenSelect={handleTokenSelect}
+                  onMaskToken={handleMaskToken}
+                  onToggleProb={(i) => {
+                    const updated = [...showProbs];
+                    updated[i] = !updated[i];
+                    setShowProbs(updated);
+                  }}
+                  onToggleGrad={(i) => {
+                    const updated = [...showGrads];
+                    updated[i] = !updated[i];
+                    setShowGrads(updated);
+                  }}
+                  selected={comp.selected}
+                  onToggle={() => toggleSelection(idx)}
+                  showCheckbox={true}
+                />
+              ))}
+            </div> 
+          </div>
         
 
           <div className="button-row">
@@ -305,5 +340,8 @@ const removeComparison = () => {
 
           </div>
         </div> 
+      </div>
+    </div>
+
   )
 }

@@ -1,28 +1,18 @@
 import React from 'react'
+import Plot from 'react-plotly.js'
 
-export default function ComparisonButtons({
+
+
+
+export  function MaskButtons({
   tokens,
-  maskedTokens,
-  layerCount,
-  model,
   task,
   onMaskToken,
-  selectedLayer,
-  selectedToken,
-  onLayerSelect,
-  onTokenSelect,
   selectedMaskToken
 }: {
   tokens: string[]
-  maskedTokens: string[]
-  layerCount: number
-  model: string
   task: string
   onMaskToken: (index: number) => void
-  selectedLayer: number
-  selectedToken: number
-  onLayerSelect: (index: number) => void
-  onTokenSelect: (index: number) => void
   selectedMaskToken: number
 }) {
   
@@ -37,7 +27,8 @@ export default function ComparisonButtons({
         Layers: <strong>{layerCount}</strong>
       </p>*/}
  
-    {task === "MLM" && (
+    {task === "MLM" && tokens.length > 0 && (
+
       <>
       
         <p style={{ fontWeight: 500, marginBottom: "0.5rem" }}>Select mask:</p>
@@ -56,6 +47,55 @@ export default function ComparisonButtons({
  
       </>
     )}
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+  )
+}
+
+
+export  function ComparisonButtons({
+  tokens,
+  maskedTokens,
+  layerCount,
+  task,
+  selectedLayer,
+  selectedToken,
+  onLayerSelect,
+  onTokenSelect,
+}: {
+  tokens: string[]
+  maskedTokens: string[]
+  layerCount: number
+  task: string
+  selectedLayer: number
+  selectedToken: number
+  onLayerSelect: (index: number) => void
+  onTokenSelect: (index: number) => void
+}) {
+  
+ 
+  return (
+    <div className="layer-stack">
+
+      {/*<p style={{ fontSize: '0.8rem', color: '#6b7280', wordWrap: 'break-word' }}>
+        Debug tokens: {JSON.stringify(tokens)}
+      </p> 
+      <p style={{ fontSize: '0.8rem', color: '#4b5563' }}>
+        Layers: <strong>{layerCount}</strong>
+      </p>*/}
+ 
+  
 
 
 

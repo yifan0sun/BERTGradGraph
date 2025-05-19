@@ -98,29 +98,45 @@
 
  
 
+.comparison-scroll-container {
+  overflow-x: auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 1rem 0;
+}
+
 .comparison-row {
   display: flex;
-  flex-direction: row; 
+  flex-wrap: nowrap;
   gap: 1.5rem;
-  margin-top: 2rem;
-  overflow-x: auto; /* helpful for narrow screens */
-  padding-bottom: 1rem;
+  width: max-content;
+  margin: 0 auto;              /* ✅ centers the row when it fits */
+  box-sizing: border-box;
 }
  
 
 .scenario-card {
+  flex: 0 0 auto;
+  width: 800px;
+  max-width: 800px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem; /* ✅ add vertical gap between inner cards */
+}
+
+.scenario-inner-card {
   background-color: white;
   border-radius: 0.5rem;
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08), 0 12px 24px rgba(0, 0, 0, 0.06);
   padding: 1.5rem;
-
-  width: 800px;
-  align-items: stretch;
-  gap: 1rem;
-
   border: 1px solid #e5e7eb;
+  box-sizing: border-box;
 }
 
+ 
+ 
+ 
  
 .warning-text {
   color: #b91c1c;
@@ -318,4 +334,16 @@ select {
 
 .word-button.selected:hover {
   background-color: #5686ee !important; /* blue-600 */
+}
+
+
+.centered-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.input-dynamic-width {
+  transition: width 0.3s ease;
+  min-width: 500px; /* ✅ Ensures the card never shrinks too small */
 }

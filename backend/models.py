@@ -52,13 +52,39 @@ class BERTVisualizer(TransformerVisualizer):
             'tokens': tokens
         }
 
- 
+    def pick_task(self,task): 
+        
+        # Naming convention for saving
+        model_id = "bert"
+        filename = f"model_{model_id}_task_{task}.pt"
+
+        # Attach a randomly initialized classifier head (same as BERTForMaskedLM)
+        self.head = nn.Linear(self.model.config.hidden_size, self.model.config.vocab_size)
+        
+
+        if os.path.exists(filename):
+            print(f"Loading pretrained head from {filename}")
+            self.head = BertOnlyMLMHead(self.model.config)
+            self.head.load_state_dict(torch.load(filename, map_location=self.device))
+            self.head.to(self.device)
+            self.head.eval()
+            
+        else:
+            print("No pretrained head found. Training...")
+            self._train_last_layer()
+            torch.save(self.head.state_dict(), filename)
+            print(f"Saved trained head to {filename}")
+  
+        self.head.eval()
+
     def predict(self, task, text):
-        print(task,text)
-        asdf
+        
+        
         if task != 'mlm':
             return task, text, 1
         
+
+        self.pick_task(task)
         # Tokenize and find [MASK] position
         inputs = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True)
         mask_index = torch.where(inputs['input_ids'] == self.tokenizer.mask_token_id)[1].item()
@@ -82,6 +108,8 @@ class BERTVisualizer(TransformerVisualizer):
         mask_logits = logits[0, mask_index]
 
         # Get top token and compute loss
+
+
         pred_token_id = torch.argmax(mask_logits).item()
         loss_fn = nn.CrossEntropyLoss()
         loss = loss_fn(mask_logits, inputs["input_ids"][0, mask_index])
@@ -91,11 +119,14 @@ class BERTVisualizer(TransformerVisualizer):
         # Backpropagate if you want gradients
         loss.backward()
         grads = inputs_embeds.grad[0]
+        gradnorms = torch.norm(grads,dim=1)
          
-
-
-
-        return predicted_token, loss, grads
+        # get top contenders
+        
+        top_probs, top_indices = torch.topk(mask_logits, k=10, dim=-1)
+        top_probs = F.softmax(top_probs, dim=-1)
+        decoded = self.tokenizer.convert_ids_to_tokens(top_indices.tolist())
+        return decoded, top_probs, gradnorms
     
 
 
