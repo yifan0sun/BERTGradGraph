@@ -86,13 +86,14 @@ class BERTVisualizer(TransformerVisualizer):
 
         self.pick_task(task)
         # Tokenize and find [MASK] position
+        print('Tokenize and find [MASK] position')
         inputs = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True)
         mask_index = torch.where(inputs['input_ids'] == self.tokenizer.mask_token_id)[1].item()
 
         # Move to device
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-        # Get embeddings
+        # Get embeddings 
         embedding_layer = self.model.embeddings.word_embeddings
         inputs_embeds = embedding_layer(inputs['input_ids'])
         inputs_embeds.requires_grad_()
@@ -114,7 +115,6 @@ class BERTVisualizer(TransformerVisualizer):
         loss_fn = nn.CrossEntropyLoss()
         loss = loss_fn(mask_logits, inputs["input_ids"][0, mask_index])
 
-        predicted_token = self.tokenizer.decode(pred_token_id)
 
         # Backpropagate if you want gradients
         loss.backward()
