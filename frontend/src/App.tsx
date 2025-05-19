@@ -5,6 +5,22 @@ import './App.css'
 import ComparisonButtons from './components/ComparisonButtons.tsx'
 import ComparisonDisplay from './components/ComparisonDisplay.tsx'
 
+const SERVER_ADDR = "http://localhost:8000/load_model";
+
+function extendList<T>(list: T[], newValue: T): T[] {
+  return [...list, newValue];
+}
+
+function maskSentence(original: string, tokenIndex: number, tokens: string[], maskToken: string): string {
+  const words = original.split(" ");
+  if (tokenIndex >= 0 && tokenIndex < words.length) {
+    words[tokenIndex] = maskToken;
+    return words.join(" ");
+  }
+  return original;
+}
+
+
 export default function App() {
   const defaultSentence = 'The quick brown fox jumps over the lazy dog.'
   const defaultModel = 'BERT'
@@ -16,47 +32,93 @@ export default function App() {
   const [layerCounts, setLayerCounts] = useState<number[]>([12]) // dummy: one per comparison
 
   const [tokensList, setTokensList] = useState<string[][]>(comparisons.map(() => []))
+  const [maskedTokensList, setMaskedTokensList] = useState<string[][]>(
+    comparisons.map(() => [])
+  )
+  const [removeWarning, setRemoveWarning] = useState(false);
 
+  const [selectedLayers, setSelectedLayers] = useState<number[]>(comparisons.map(() => -1));  // e.g. -1 = none
+  const [selectedTokens, setSelectedTokens] = useState<number[]>(comparisons.map(() => -1));
+
+  const [selectedMaskTokens, setSelectedMaskTokens] = useState<number[]>(comparisons.map(() => -1));
+  const [maskTokens, setMaskTokens] = useState<string[]>(comparisons.map(() => "[MASK]"));
+
+  const handleLayerSelect = (idx: number, layer: number) => {
+    const updated = [...selectedLayers];
+    updated[idx] = layer;
+    setSelectedLayers(updated);
+  };
+  
+  const handleTokenSelect = (idx: number, token: number) => {
+    const updated = [...selectedTokens];
+    updated[idx] = token;
+    setSelectedTokens(updated);
+  };
 
   const handleInputChange = (index, key, value) => {
-    const newComps = [...comparisons]
-    newComps[index][key] = value
-    setComparisons(newComps)
+    const newComps = [...comparisons];
+    const oldTask = newComps[index].task;
+  
+    newComps[index][key] = value;
+    setComparisons(newComps);
+  
+    // Determine if we need to reset masked tokens
+    const isNowMLM = (key === "task" && value === "MLM") || (key === "model" && newComps[index].task === "MLM");
+    const wasNotMLM = oldTask !== "MLM";
 
-    updateBackendInfo(newComps[index], index)
+    if (isNowMLM && wasNotMLM) {
+      const newMasked = [...maskedTokensList];
+      newMasked[index] = [...tokensList[index]];
+      setMaskedTokensList(newMasked);
+      console.log(`🔄 Resetting masked tokens for scenario ${index}`);
+    }
 
   }
 
 
   const handleGo = () => {
-    setResults(Array(comparisons.length).fill(dummyImage))
-  }
+    setResults(Array(comparisons.length).fill(dummyImage));
+    comparisons.forEach((comp, idx) => updateBackendInfo(comp, idx));
+  };
+  
+  
+ 
 
   const addComparison = () => {
   if (comparisons.length < 3) {
-    const prev = comparisons[comparisons.length - 1]
-    setComparisons([...comparisons, {
-      model: prev.model,
-      task: prev.task,
-      selected: false,
-    }])
-    setLayerCounts([...layerCounts, layerCounts[layerCounts.length - 1]])
-    setResults([...results, dummyImage])
-    setTokensList([...tokensList, []])
+    const prev = comparisons[comparisons.length - 1];
+    const newComparison = { model: prev.model, task: prev.task, selected: false };
 
+    setComparisons(extendList(comparisons, newComparison));
+    setLayerCounts(extendList(layerCounts, layerCounts[layerCounts.length - 1]));
+    setResults(extendList(results, dummyImage));
+    setTokensList(extendList(tokensList, []));
+    setMaskedTokensList(extendList(maskedTokensList, []));
+    setSelectedLayers(extendList(selectedLayers, -1));
+    setSelectedTokens(extendList(selectedTokens, -1));
   }
 }
 
 
-  const removeComparison = () => {
-    if (comparisons.length === 2) {
-      setComparisons(comparisons.filter((_, idx) => !comparisons[idx].selected))
-      setResults(results.slice(0, comparisons.length - 1))
-    } else if (comparisons.length > 1) {
-      setComparisons(comparisons.slice(0, -1))
-      setResults(results.slice(0, -1))
-    }
+const removeComparison = () => {
+  const hasSelection = comparisons.some((c) => c.selected);
+
+  if (!hasSelection) {
+    setRemoveWarning(true);
+    return;
   }
+
+  setRemoveWarning(false); // clear warning if selection exists
+
+  if (comparisons.length === 2) {
+    setComparisons(comparisons.filter((_, idx) => !comparisons[idx].selected));
+    setResults(results.slice(0, comparisons.length - 1));
+  } else if (comparisons.length > 1) {
+    setComparisons(comparisons.slice(0, -1));
+    setResults(results.slice(0, -1));
+  }
+};
+
 
   const toggleSelection = (index) => {
     const newComps = [...comparisons]
@@ -66,99 +128,157 @@ export default function App() {
 
 
   const updateBackendInfo = async (comp, idx) => {
-    const res = await fetch("http://localhost:8000/load_model", {
+    const isMLM = comp.task === "MLM";
+    const effectiveSentence = isMLM
+    ? maskSentence(sentence, selectedMaskTokens[idx], tokensList[idx], maskTokens[idx])
+    : sentence;
+    console.log(`🧠 Sending text to server: "${effectiveSentence}"`);
+  
+    const res = await fetch(SERVER_ADDR, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: comp.model,
         task: comp.task,
-        sentence,
+        sentence: effectiveSentence,
+        selected_layer: selectedLayers[idx],
+        selected_token: selectedTokens[idx],
       }),
-    })
+    });
+  
     const data = await res.json()
+    
+    console.log("Backend returned:", data);
+
+
     if (!data.error) {
       const newLayers = [...layerCounts]
       newLayers[idx] = data.num_layers
       setLayerCounts(newLayers)
 
-      const newTokens = [...tokensList]
-      newTokens[idx] = data.tokens
-      setTokensList(newTokens)
+      // Only set tokensList the first time
+      if (tokensList[idx].length === 0) {
+        const newTokens = [...tokensList];
+        newTokens[idx] = data.tokens;
+        setTokensList(newTokens);
+      }
+
+      // Always set maskedTokensList for MLM
+      if (comp.task === "MLM") {
+        const newMasked = [...maskedTokensList];
+        newMasked[idx] = data.tokens;
+        setMaskedTokensList(newMasked);
+      }
+      
+      const newMaskTokens = [...maskTokens];
+      newMaskTokens[idx] = data.mask_token || newMaskTokens[idx];
+      setMaskTokens(newMaskTokens);
     }
   }
-
+  const handleMaskToken = (idx, tokenIndex) => {
+    const originalTokens = tokensList[idx];
+    const newTokens = [...originalTokens];
+    const maskedToken = originalTokens[tokenIndex];
+  
+    // Apply the mask
+    newTokens[tokenIndex] = maskTokens[idx];
+    const newSentence = newTokens.join(" ");
+  
+    console.log(`🔍 Masking token "${maskedToken}" at position ${tokenIndex}`);
+    console.log(`📤 Prepared masked sentence: "${newSentence}"`);
+  
+    // Update maskedTokensList only (NOT tokensList)
+    if (comparisons[idx].task === "MLM") {
+      const newMasked = [...maskedTokensList];
+      newMasked[idx] = newTokens;
+      setMaskedTokensList(newMasked);
+    }
+  
+    // Update selectedMaskTokens
+    const newSelectedMasks = [...selectedMaskTokens];
+    newSelectedMasks[idx] = tokenIndex;
+    setSelectedMaskTokens(newSelectedMasks);
+  };
+  
+  
 
   useEffect(() => {
     setResults(Array(comparisons.length).fill(dummyImage))
   }, [comparisons.length])
 
-  useEffect(() => {
-  comparisons.forEach((comp, idx) => updateBackendInfo(comp, idx))
-}, [sentence])
+
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] font-serif">
-  <   div className="max-w-5xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+    <div className="page">
+      <div className="container">
 
         <h1 className="text-2xl font-bold mb-4">Transformers: gradients and graphs</h1>
 
-              <div className="max-w-3xl mx-auto bg-white border border-gray-200 rounded-xl shadow-md p-10 space-y-6 m-16">
-                <p className="text-gray-500 text-md">
-                  Type a sample passage here. <br />
-                  (Best performance if fewer than 500 words.)
+            <div className="card">
+                <p>
+                  Type a sample passage here.    (Best performance if fewer than 500 words.)
                 </p>
-
-                <input
-                  type="text"
+                <div className="input-row">
+                <textarea
+                  className="input-box"
                   placeholder="e.g. The quick brown fox jumps over the lazy dog."
                   value={sentence}
                   onChange={(e) => setSentence(e.target.value)}
-                  className="w-full p-5 text-lg border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                  rows={4}
                 />
-
+              <button className="button" onClick={handleGo}>Apply</button>
+              </div>
                 <p></p>
               </div>
 
 
-          <div className="mt-16">
-
-
-
-              <div className="flex gap-6 overflow-x-auto pb-2">
+              <div className="comparison-row">
                 {comparisons.map((comp, idx) => (
-                  <div key={idx} className="w-full max-w-sm flex flex-col gap-3 border p-4 rounded shadow bg-white items-center">
+                  <div key={idx} className="scenario-card">
+                    
+ 
+                    <div className="dropdown-row">
+                      <div className="dropdown-group">
+                        <label className="dropdown-label">Pick model</label>
+                        <select value={comp.model} onChange={(e) => handleInputChange(idx, 'model', e.target.value)}>
+                          <option value="">Select Model</option>
+                          <option>BERT</option>
+                          <option>BART</option>
+                          <option>RoBERTa</option>
+                          <option>DistilBERT</option>
+                        </select>
+                      </div>
 
-                    <h2 className="font-semibold text-lg">Scenario {idx + 1}</h2>
+                      <div className="dropdown-group">
+                        <label className="dropdown-label">Pick task</label>
+                        <select value={comp.task} onChange={(e) => handleInputChange(idx, 'task', e.target.value)}>
+                          <option value="">Select Task</option>
+                          <option>MLM</option>
+                          <option>NSP</option>
+                          <option>SST2</option>
+                          <option>SQUAD</option>
+                        </select>
+                      </div>
 
-                    <select
-                      value={comp.model}
-                      onChange={(e) => handleInputChange(idx, 'model', e.target.value)}
-                      className="p-2 border rounded w-48"
-                    >
-                      <option value="">Select Model</option>
-                      <option>BERT</option>
-                      <option>BART</option>
-                      <option>RoBERTa</option>
-                      <option>DistilBERT</option>
-                    </select>
-
-                    <select
-                      value={comp.task}
-                      onChange={(e) => handleInputChange(idx, 'task', e.target.value)}
-                      className="p-2 border rounded w-48"
-                    >
-                      <option value="">Select Task</option>
-                      <option>MLM</option>
-                      <option>NSP</option>
-                      <option>SST2</option>
-                      <option>SQUAD</option>
-                    </select>
+                      <div className="apply-button-container">
+                      <button className="button" onClick={() => updateBackendInfo(comp, idx)}>Apply</button>
+                      </div>
+                    </div>
 
                     <ComparisonButtons
                       tokens={tokensList[idx]}
+                      maskedTokens={maskedTokensList[idx]}
                       layerCount={layerCounts[idx]}
+                      model={comp.model}
+                      task={comp.task}
+                      onMaskToken={(tokenIdx) => handleMaskToken(idx, tokenIdx)}
+                      selectedLayer={selectedLayers[idx]}
+                      selectedToken={selectedTokens[idx]}
+                      onLayerSelect={(layerIdx) => handleLayerSelect(idx, layerIdx)}
+                      onTokenSelect={(tokenIdx) => handleTokenSelect(idx, tokenIdx)}
+                      selectedMaskToken={selectedMaskTokens[idx]} 
                     />
-
+ 
                     <ComparisonDisplay
                       image={results[idx]}
                       selected={comp.selected}
@@ -170,35 +290,20 @@ export default function App() {
                 ))}
               </div>
 
-              <button
-                onClick={handleGo}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Go
-              </button>
             </div>
 
         
 
-          <div className="mt-6 space-x-4">
+          <div className="button-row">
             {comparisons.length < 3 && (
-              <button
-                onClick={addComparison}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              >
-                Add Side by Side Comparison
-              </button>
+              <button className="button" onClick={addComparison}>Add a scenario</button>
             )}
             {comparisons.length > 1 && (
-              <button
-                onClick={removeComparison}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Remove a Comparison
-              </button>
+              <button className="button" onClick={removeComparison}>Remove a scenario</button>
             )}
+              {removeWarning && <p className="warning-text">Select a scenario for removal.</p>}
+
           </div>
-        </div>
-      </div>
+        </div> 
   )
 }

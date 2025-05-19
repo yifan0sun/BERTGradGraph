@@ -1,3 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* index.css - stripped of Tailwind */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
+    font-family: system-ui, sans-serif;
+    line-height: 1.5;
+    background-color: #e9eef6;
+    color: #222;
+    padding: 1rem;
+  }
+  
