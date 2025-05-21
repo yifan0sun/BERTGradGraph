@@ -43,11 +43,7 @@ export function LeftPanel({
     const [modelLoaded, setModelLoaded] = useState(false);
     const [predictionTriggered, setPredictionTriggered] = useState(false);
 
-    const availableTasks = taskOptions.filter(task => {
-        if (selectedModel === 'DistilBERT' && task === 'SQuAD') return false;
-        return true;
-    });
-
+  
     
    const handleConfirmSentence = async () => {
 
@@ -294,9 +290,9 @@ useEffect(() => {
             onChange={e => setSelectedTask(e.target.value)}
             style={{ width: '100%' }}
             >
-            {availableTasks.map(task => (
-                <option key={task} value={task}>{task}</option>
-            ))}
+            {taskOptions.map(task => (
+  <option key={task} value={task}>{task}</option>
+))}
         </select>
 
 

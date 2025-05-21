@@ -14,6 +14,8 @@ VISUALIZER_CLASSES = {
     "RoBERTa": RoBERTaVisualizer,
     "DistilBERT": DistilBERTVisualizer,
 }
+
+VISUALIZER_CACHE = {}
 app = FastAPI()
 
 app.add_middleware(
@@ -53,6 +55,11 @@ def load_model(req: LoadModelRequest):
     print(f"Model: {req.model}")
     print(f"Sentence: {req.sentence}")
     print(f"Task: {req.task}")
+
+
+    if req.model in VISUALIZER_CACHE:
+        del VISUALIZER_CACHE[req.model]
+    torch.cuda.empty_cache()
 
     vis_class = VISUALIZER_CLASSES.get(req.model)
     if vis_class is None:
@@ -95,25 +102,16 @@ def predict_model(req: PredModelRequest):
     print(f"Task: {req.task}")
     print(f"sentence: {req.sentence}")
 
+
+
     print('instantiating')
-    try:
-        
-        vis_class = VISUALIZER_CLASSES.get(req.model)
-        if vis_class is None:
-            return {"error": f"Unknown model: {req.model}"}
-        print("Visualizer instantiated(1/2)")
-    except Exception as e:
-        print("Visualizer init failed:", e)
-        return {"error": f"Instantiation failed: {str(e)}"}
-
-    try:
-        
-        vis = vis_class(task=req.task.lower())
-        print("Visualizer instantiated (2/2)")
-    except Exception as e:
-        print("Visualizer init failed:", e)
-        return {"error": f"Instantiation failed: {str(e)}"}
-
+    vis = VISUALIZER_CACHE.get(req.model)
+    if vis is None:
+        return {"error": f"Model {req.model} is not loaded. Please call /load_model first."}
+    
+    
+    if any(p.device.type == 'meta' for p in vis.model.parameters()):
+        raise RuntimeError("Model is in meta device. Reload it cleanly using /load_model.")
     
 
     
@@ -144,12 +142,11 @@ def get_grad_attn_matrix(req: GradAttnModelRequest):
         print(f"sentence: {req.sentence}")
         print(f"Selected layer: {req.selected_layer}")
         
-
-        vis_class = VISUALIZER_CLASSES.get(req.model)
-        if vis_class is None:
-            return {"error": f"Unknown model: {req.model}"}
-
-        vis = vis_class(task=req.task.lower())
+        if any(p.device.type == 'meta' for p in vis.model.parameters()):
+            raise RuntimeError("Model is in meta device. Reload it cleanly using /load_model.")
+        vis = VISUALIZER_CACHE.get(req.model)
+        if vis is None:
+            return {"error": f"Model {req.model} is not loaded. Please call /load_model first."}
 
 
         

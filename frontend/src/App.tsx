@@ -46,8 +46,9 @@ const handleComputeMatrix = async () => {
         const attn = data.attn_matrix ?? [];
         const grad = data.grad_matrix ?? [];
 
-        // Always send gradient matrix for now
-        setMatrix(task === 'MLM' ? grad : attn);
+        
+        setMatrix(grad ?? attn ?? []);
+
     } catch (err) {
         console.error('Error computing matrix:', err);
     }
