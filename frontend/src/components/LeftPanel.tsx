@@ -201,7 +201,8 @@ const handleComputeMatrix = async  (
 
 
      try {
-        const res = await fetch('http://localhost:8000/get_grad_attn_matrix', {
+        const res = await fetch(`${SERVER_ADDRESS}/get_grad_attn_matrix`, {
+
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),  
