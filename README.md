@@ -27,9 +27,14 @@ A directed bipartite graph shows how much attention each token gives to others i
 
 Using input embedding gradients, the tool computes how much each token influences the attention map — providing a saliency-like signal across the sequence.
 
-### 3. **Top Predictions (MLM only)**
+### 3. **Top Predictions**
 
-For masked language modeling tasks, the tool displays a horizontal bar chart showing the model's top predicted tokens and associated probabilities.
+The tool displays model predictions for the selected task:
+- **MLM**: shows the model's top predicted tokens for the masked position.
+- **SST**: shows sentiment classification scores (e.g., positive vs. negative).
+- **MNLI**: shows the model’s confidence scores for entailment, neutrality, or contradiction between the premise and hypothesis.
+
+All predictions are visualized using an interactive bar chart.
 
 ---
 
