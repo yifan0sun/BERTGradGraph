@@ -6,17 +6,18 @@ from transformers import (
     RobertaForMaskedLM, RobertaForSequenceClassification
 )
 
+CACHE_DIR  = "./hf_cache"
 class RoBERTaVisualizer(TransformerVisualizer):
     def __init__(self, task):
         super().__init__()
         self.task = task
-        self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+        self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base', cache_dir=CACHE_DIR)
         if self.task == 'mlm':
-            self.model = RobertaForMaskedLM.from_pretrained("roberta-base")
+            self.model = RobertaForMaskedLM.from_pretrained("roberta-base", cache_dir=CACHE_DIR)
         elif self.task == 'sst':
-            self.model = RobertaForSequenceClassification.from_pretrained('textattack/roberta-base-SST-2')
+            self.model = RobertaForSequenceClassification.from_pretrained('textattack/roberta-base-SST-2', cache_dir=CACHE_DIR)
         elif self.task == 'mnli':
-            self.model = RobertaForSequenceClassification.from_pretrained("roberta-large-mnli")
+            self.model = RobertaForSequenceClassification.from_pretrained("roberta-large-mnli", cache_dir=CACHE_DIR)
 
 
         self.model.to(self.device)

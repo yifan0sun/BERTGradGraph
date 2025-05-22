@@ -52,6 +52,10 @@ class PredModelRequest(BaseModel):
     hypothesis:str
     maskID: int | None = None
 
+@app.get("/ping")
+def ping():
+    return {"message": "pong"}
+
 
 @app.post("/load_model")
 def load_model(req: LoadModelRequest):

@@ -11,23 +11,26 @@ from transformers import (
 )
 import torch.nn.functional as F
 
+
+CACHE_DIR  = "./hf_cache"
  
     
 class BERTVisualizer(TransformerVisualizer):
     def __init__(self,task):
         super().__init__()  
         self.task = task
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', cache_dir=CACHE_DIR)
         print('finding model', self.task)
         if self.task == 'mlm':
             self.model = BertForMaskedLM.from_pretrained(
                 "bert-base-uncased",
-                attn_implementation="eager"  # fallback to standard attention
+                attn_implementation="eager",  # fallback to standard attention
+                cache_dir=CACHE_DIR
             ).to(self.device)
         elif self.task == 'sst':
-            self.model = BertForSequenceClassification.from_pretrained("textattack/bert-base-uncased-SST-2",device_map=None)
+            self.model = BertForSequenceClassification.from_pretrained("textattack/bert-base-uncased-SST-2",device_map=None, cache_dir=CACHE_DIR)
         elif self.task == 'mnli':
-            self.model = BertForSequenceClassification.from_pretrained("textattack/bert-base-uncased-MNLI", device_map=None)
+            self.model = BertForSequenceClassification.from_pretrained("textattack/bert-base-uncased-MNLI", device_map=None, cache_dir=CACHE_DIR)
         else:
             raise ValueError(f"Unsupported task: {self.task}")
         print('model found')

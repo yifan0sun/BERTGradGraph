@@ -12,17 +12,18 @@ from transformers import (
     DistilBertForMaskedLM, DistilBertForSequenceClassification
 )    
 
+CACHE_DIR  = "./hf_cache"
 class DistilBERTVisualizer(TransformerVisualizer):
     def __init__(self, task):
         super().__init__()
         self.task = task
-        self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+        self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased', cache_dir=CACHE_DIR)
         if self.task == 'mlm':
-            self.model = DistilBertForMaskedLM.from_pretrained('distilbert-base-uncased')
+            self.model = DistilBertForMaskedLM.from_pretrained('distilbert-base-uncased', cache_dir=CACHE_DIR)
         elif self.task == 'sst':
-            self.model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased-finetuned-sst-2-english')
+            self.model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased-finetuned-sst-2-english', cache_dir=CACHE_DIR)
         elif self.task == 'mnli':
-            self.model = DistilBertForSequenceClassification.from_pretrained("textattack/distilbert-base-uncased-MNLI")
+            self.model = DistilBertForSequenceClassification.from_pretrained("textattack/distilbert-base-uncased-MNLI", cache_dir=CACHE_DIR)
 
 
         else:
