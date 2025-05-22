@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-const SERVER_ADDRESS = 'https://yifan0sun.hf.space';
+const SERVER_ADDRESS = 'https://yifan0sun-bertgradgraph.hf.space';
 //const SERVER_ADDRESS = 'http://localhost:8000';
 import '../App.css';
 import { cleanToken } from  '../utils.ts'
@@ -248,7 +248,7 @@ const handleComputeMatrix = async  (
   return (
     <div style={{ width: '300px', padding: '1rem', borderRight: '1px solid #ccc' }}>
 
-{/*
+
 <div style={{
   fontSize: '12px',
   fontFamily: 'monospace',
@@ -261,9 +261,10 @@ const handleComputeMatrix = async  (
   Tokens: {tokens.length}<br />
   Num Layers: {numLayers ?? 0}<br />
   Matrix shape (attention): {tokens.length > 0 && numLayers ? `${numLayers} × ${tokens.length}` : 'n/a'}<br />
-  masked token: {selectedTokenIdxToMask}
+  masked token: {selectedTokenIdxToMask}<br />
+  sentence: {confirmedSentence}
 </div>
-*/}
+
 
 
       {/* Sentence input */}

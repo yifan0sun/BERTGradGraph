@@ -220,8 +220,8 @@ if (
   <>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
 
-{/*
-        
+
+      
         <div
           style={{
             fontSize: '12px',
@@ -261,7 +261,7 @@ if (
   - Gradient: {matrices.gradient?.[layer - 1]?.length ?? 0} × {matrices.gradient?.[layer - 1]?.[0]?.length ?? 0}
 </div>
 
- */}
+ 
 
 
 

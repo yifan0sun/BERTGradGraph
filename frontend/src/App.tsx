@@ -54,7 +54,7 @@ const [mode, setMode] = useState<'attention' | 'gradient'>('attention');
 
     </div>
 
-{/*
+
 
     <div style={{
   fontSize: '12px',
@@ -69,7 +69,7 @@ const [mode, setMode] = useState<'attention' | 'gradient'>('attention');
   Matrix shape ({mode}, layer {selectedLayer}): {matrices[mode]?.[selectedLayer - 1]?.length ?? 0} × {matrices[mode]?.[selectedLayer - 1]?.[0]?.length ?? 0}
 </div>
 
-*/}
+
     {/* Main content below the top bar */}
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
       {/* Left Panel */}
