@@ -56,6 +56,17 @@ class PredModelRequest(BaseModel):
 def ping():
     return {"message": "pong"}
 
+ 
+
+@app.post("/upload_model")
+async def upload_model(file: UploadFile = File(...)):
+    save_path = f"/data/models/{file.filename}"  # or wherever your disk is mounted
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    with open(save_path, "wb") as f:
+        f.write(await file.read())
+    return {"status": "uploaded", "path": save_path}
+
+
 
 @app.post("/load_model")
 def load_model(req: LoadModelRequest):
@@ -216,4 +227,21 @@ def get_grad_attn_matrix(req: GradAttnModelRequest):
         print("SERVER EXCEPTION:", e)
         return {"error": str(e)}
     
+"""
+if __name__ == "__main__":
+     
+    print('rim ')
+    BERTVisualizer('mlm')
+    BERTVisualizer('mnli')
+    BERTVisualizer('sst')
 
+
+    RoBERTaVisualizer('mlm')
+    RoBERTaVisualizer('mnli')
+    RoBERTaVisualizer('sst')
+
+
+    DistilBERTVisualizer('mlm')
+    DistilBERTVisualizer('mnli')
+    DistilBERTVisualizer('sst')
+"""
