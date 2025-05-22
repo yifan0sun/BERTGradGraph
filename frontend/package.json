@@ -6,7 +6,7 @@
  "scripts": {
   "start": "vite",
   "dev": "vite",
-  "build": "vite build --outDir docs",
+  "build": "vite build --outDir ../docs",
   "preview": "vite preview"
 },
   "dependencies": {
