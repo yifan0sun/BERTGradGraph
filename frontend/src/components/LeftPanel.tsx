@@ -1,27 +1,25 @@
 import React, { useState, useEffect } from 'react';
-const SERVER_ADDRESS = 'http://localhost:8000';
+const SERVER_ADDRESS = 'https://yifan0sun.hf.space';
+//const SERVER_ADDRESS = 'http://localhost:8000';
 import '../App.css';
 import { cleanToken } from  '../utils.ts'
 
 
 export function LeftPanel({
       onStateUpdate,
-      onComputeMatrix,
 }: {
-  onStateUpdate: (state: {
-    sentence: string;
-    maskedSentence:string;
-    tokens: string[];
-    task: string;
-    model: string;
-    numLayers: number;
-  }) => void;
-  onComputeMatrix: () => void;
+onStateUpdate: (state: {
+  tokens: string[];
+  numLayers: number;
+  matrices: {
+    attention: number[][][];
+    gradient: number[][][];
+  };
+}) => void;
 }) {
     const DEFAULT_SENTENCE = 'The quick brown fox jumps over the lazy dog.';
     const [inputSentence, setInputSentence] = useState(DEFAULT_SENTENCE);
     const [confirmedSentence, setConfirmedSentence] = useState(DEFAULT_SENTENCE);
-    const [maskedSentence, setMaskedSentence] = useState(DEFAULT_SENTENCE);
 
     const [selectedModel, setSelectedModel] = useState('BERT');
     const [selectedTask, setSelectedTask] = useState('MLM');
@@ -40,118 +38,126 @@ export function LeftPanel({
     const modelOptions = ['BERT', 'RoBERTa',  'DistilBERT'];
     const taskOptions = ['MLM', 'SST', 'MNLI'];
 
-    const [modelLoaded, setModelLoaded] = useState(false);
-    const [predictionTriggered, setPredictionTriggered] = useState(false);
+    
+  const [isRetrievingMatrix, setIsRetrievingMatrix] = useState(false);
 
-  
     
    const handleConfirmSentence = async () => {
 
 
-    
-  const rawWords = inputSentence.trim().split(/\s+/);
-  const limited = rawWords.slice(0, 200).join(' ');
+     
 
 
-  setInputSentence(limited);              // ✅ update textarea
-  setConfirmedSentence(limited);          // backend logic
-  setConfirmedHypothesis(inputHypothesis);
-
-  setMaskedSentence(limited);
-  setTokens([]);
+  setConfirmedSentence(inputSentence);
+  setConfirmedHypothesis(inputSentence); 
+   
   setNumLayers(null);
   setSelectedTokenIdxToMask(null);
-  setModelLoaded(false);
   setPredictTokens([]);
   setPredictProbs([]);
 
   onStateUpdate({
-    sentence: limited,
-    maskedSentence: limited,
-    tokens: [],
-    task: selectedTask,
-    model: selectedModel,
+    tokens: tokens,
     numLayers: 0,
+    matrices: {
+      attention: [],  // one empty matrix per layer
+      gradient: [],
+    },
   });
 };
 
 
 
+const handleLoadModel = async (
+  
+  selectedModel: string,
+  selectedTask: string,
+  confirmedSentence: string,
+  confirmedHypothesis: string
 
-  const handleLoadModel = async () => {
+) => {
   try {
-    const res = await fetch(`${SERVER_ADDRESS}/load_model`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: selectedModel,
-        task:  selectedTask,
-        sentence: selectedTask === 'MNLI'
-            ? `${confirmedSentence} [SEP] ${confirmedHypothesis}`
-            : confirmedSentence,
-      }),
-    });
-
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-
-    const newTokens = data.tokens ?? [];
-    setTokens(newTokens);
-    setNumLayers(data.num_layers ?? null);
-
-    const firstMaskableIdx = newTokens.findIndex(
-      (tok) => !['[SEP]', '[MASK]', '[CLS]', '<s>', '</s>'].includes(tok)
-    );
-    setSelectedTokenIdxToMask(firstMaskableIdx !== -1 ? firstMaskableIdx : null);
-
-    const newMaskedSentence =
-      selectedTask === 'MLM' && firstMaskableIdx !== -1
-        ? newTokens.map((tok, i) => (i === firstMaskableIdx ? '[MASK]' : tok)).join(' ')
-        : confirmedSentence;
-
-    setMaskedSentence(newMaskedSentence);
-
-    onStateUpdate({
-      sentence: confirmedSentence,
-      maskedSentence: newMaskedSentence,
-      tokens: newTokens,
-      task: selectedTask,
-      model: selectedModel,
-      numLayers: data.num_layers ?? 0,
-    });
-
-     
-    setModelLoaded(true);
-  } catch (err) {
-    setModelInfo(`Error loading model: ${err}`);
-  }
-};
-
-
-
-
-
-useEffect(() => {
-  if (selectedTask === 'MLM' && selectedTokenIdxToMask !== null) {
-    handlePredict();        // forward
-    onComputeMatrix();      // backward
-  }
-}, [selectedTokenIdxToMask]);
-
-
-  const handlePredict = async () => {
-  try {
-    const res = await fetch(`${SERVER_ADDRESS}/predict_model`, {
+      const res = await fetch(`${SERVER_ADDRESS}/load_model`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: selectedModel,
         task: selectedTask,
-        sentence: selectedTask === 'MNLI'
-            ? `${confirmedSentence} [SEP] ${confirmedHypothesis}`
-            : maskedSentence,
-
+        sentence: confirmedSentence,
+        hypothesis:  confirmedHypothesis
       }),
+    });
+   
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+ 
+    if (!data.tokens || !Array.isArray(data.tokens)) {
+      throw new Error('Invalid or missing tokens array in server response.');
+    }
+
+    const newTokens = Array.isArray(data.tokens) ? data.tokens : [];
+    const layerCount = typeof data.num_layers === 'number' ? data.num_layers : 0;
+    
+    setTokens(newTokens);
+    setNumLayers(layerCount);
+    
+ 
+     
+
+
+ onStateUpdate({
+  tokens: newTokens,
+  numLayers: layerCount,
+  matrices: {
+    attention: Array.from({ length: layerCount }, () => []),
+    gradient: Array.from({ length: layerCount }, () => []),
+  },
+});
+    
+
+    
+    setModelInfo(null);
+
+   
+  return { tokens: newTokens, numLayers: layerCount };
+
+  } catch (err) {
+    console.error('Load model failed:', err);
+    setModelInfo(`Error loading model: ${String(err)}`);
+  }
+
+};
+
+
+
+
+const handlePredict = async (
+  
+  selectedModel: string,
+  selectedTask: string,
+  confirmedSentence: string,
+  confirmedHypothesis: string
+  
+) => {
+  try {
+    const payload: any = {
+      model: selectedModel,
+      task: selectedTask,
+      hypothesis: '',
+      maskID: 0,
+      sentence: confirmedSentence
+    };
+
+    if (selectedTask === 'MLM') {
+      payload.maskID = selectedTokenIdxToMask;
+    } else if (selectedTask === 'MNLI') {
+      payload.hypothesis = confirmedHypothesis;
+    } 
+
+    const res = await fetch(`${SERVER_ADDRESS}/predict_model`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
 
     const data = await res.json();
@@ -159,7 +165,6 @@ useEffect(() => {
 
     setPredictTokens(data.decoded ?? []);
     setPredictProbs(data.top_probs ?? []);
-    setPredictionTriggered(true);
   } catch (err) {
     setModelInfo(`Error during prediction: ${err}`);
   }
@@ -167,76 +172,98 @@ useEffect(() => {
 
 
 
- 
 
-useEffect(() => {
-  if (tokens.length === 0 || numLayers === null) return;
+const handleComputeMatrix = async  (
+  
+  model: string,
+  task: string,
+  sentence:string,
+  hypothesis: string,
+  currentTokens: string[]   
+  
+) => {
+  setIsRetrievingMatrix(true);  // ⬅️ Start loading
 
-  setModelInfo(
-    `Loaded model ${selectedModel}. ${numLayers} layers.\n` +
-    `Original: "${confirmedSentence}"\n` +
-    `Masked:   "${maskedSentence}"\n` +
-    `Tokens: [${tokens.join(', ')}]`
-  );
-}, [confirmedSentence, maskedSentence, selectedTokenIdxToMask, tokens, selectedModel, numLayers]);
+    const payload: any = {
+      model,
+      task,
+      hypothesis: '', // default, overridden below
+      sentence: sentence,
+      maskID: 0,
+    };
 
-
- 
-useEffect(() => {
-  if (predictionTriggered) {
-    handlePredict();
-  }
-}, [maskedSentence, selectedModel, selectedTask]);
-
-
-useEffect(() => {
-  if (selectedTask === 'MLM' && selectedTokenIdxToMask === null) {
-    const firstMaskableIdx = tokens.findIndex(
-      (tok) => !['[SEP]', '[MASK]', '[CLS]', '<s>', '</s>'].includes(tok)
-    );
-    if (firstMaskableIdx !== -1) {
-      setSelectedTokenIdxToMask(firstMaskableIdx);
+    if (task === 'MLM') {
+      payload.maskID = selectedTokenIdxToMask;
+    } else if (task === 'MNLI') {
+      payload.hypothesis = hypothesis;
     }
+
+
+
+     try {
+        const res = await fetch('http://localhost:8000/get_grad_attn_matrix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),  
+        });
+
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        const attn = data?.["attn_matrix"] ?? [];
+        const grad = data?.["grad_matrix"] ?? [];
+
+
+        onStateUpdate({
+          tokens: currentTokens,
+          numLayers: attn.length,
+          matrices: {
+            attention: attn,
+            gradient: grad,
+          },
+        });
+        
+
+    } catch (err) {
+        console.error('Error computing matrix:', err);
+    } finally {
+    setIsRetrievingMatrix(false);  // ⬅️ End loading
   }
-}, [tokens, selectedTask]);
+};
+ 
 
 
-useEffect(() => {
-  if (selectedTask !== 'MLM') return;
-  if (selectedTokenIdxToMask === null || tokens.length === 0) return;
 
-  const newMaskedSentence = tokens
-    .map((tok, i) => (i === selectedTokenIdxToMask ? '[MASK]' : tok))
-    .join(' ');
-
-  setMaskedSentence(
-    selectedTask === 'MLM'
-        ? limited.split(/\s+/).map((w, i) => (i === 0 ? '[MASK]' : w)).join(' ')
-        : limited
-    );
-
-  // Send update to App so sentence -> BottomPanel updates too
-  onStateUpdate({
-    sentence: confirmedSentence,
-    maskedSentence: newMaskedSentence,
-    tokens,
-    task: selectedTask,
-    model: selectedModel,
-    numLayers: numLayers ?? 0,
-  });
-}, [selectedTokenIdxToMask]);
+ 
 
 
-useEffect(() => {
-  if (modelLoaded && selectedTask !== 'MLM') {
-    handlePredict();        // forward
-    onComputeMatrix();      // backward
-  }
-}, [modelLoaded, selectedTask]);
+
+ 
+
+ 
+ 
 
 
   return (
     <div style={{ width: '300px', padding: '1rem', borderRight: '1px solid #ccc' }}>
+
+{/*
+<div style={{
+  fontSize: '12px',
+  fontFamily: 'monospace',
+  marginTop: '1rem',
+  backgroundColor: '#f4f4f4',
+  padding: '0.5rem',
+  borderTop: '1px solid #ccc'
+}}>
+  <strong>[LeftPanel] Debug:</strong><br />
+  Tokens: {tokens.length}<br />
+  Num Layers: {numLayers ?? 0}<br />
+  Matrix shape (attention): {tokens.length > 0 && numLayers ? `${numLayers} × ${tokens.length}` : 'n/a'}<br />
+  masked token: {selectedTokenIdxToMask}
+</div>
+*/}
+
 
       {/* Sentence input */}
       <div style={{ marginBottom: '1rem' }}>
@@ -287,7 +314,11 @@ useEffect(() => {
         <select
             className="uniform-select"
             value={selectedTask}
-            onChange={e => setSelectedTask(e.target.value)}
+            onChange={(e) => {
+              setSelectedTask(e.target.value);
+              setPredictTokens([]);
+              setPredictProbs([]);
+            }}
             style={{ width: '100%' }}
             >
             {taskOptions.map(task => (
@@ -296,10 +327,7 @@ useEffect(() => {
         </select>
 
 
-         {/* Load model button */}
-      <button className="uniform-button" onClick={handleLoadModel} style={{ marginTop: '1rem' }}>
-        Load Model
-      </button>
+      
       
       </div>
 
@@ -312,34 +340,96 @@ useEffect(() => {
      
 
 
-            <div style={{ marginBottom: '1rem' }}>
-            <label>Word to Mask:</label><br />
-            <select
-                className="uniform-select"
-                value={selectedTokenIdxToMask ?? ''}
-                onChange={e => setSelectedTokenIdxToMask(parseInt(e.target.value))}
-                style={{ width: '100%' }}
-            >
-                {tokens.map(cleanToken)
-                    .map((word, idx) => (
-                    !['[SEP]', '[MASK]', '[CLS]', '</s>', '<s>'].includes(word) ? (
-                        <option key={idx} value={idx}>
-                         {idx} {word}
-                        </option>
-                    ) : null
-                    ))}
+        
 
-            </select>
-            </div>
-            
+
+      <div style={{ marginBottom: '1rem' }}>
+  <label>Word to Mask:</label><br />
+  <select
+    className="uniform-select"
+    value={selectedTokenIdxToMask ?? ''}
+    onChange={async (e) => {
+      const val = e.target.value;
+      const newMaskIdx = val === '' ? null : parseInt(val);
+      setSelectedTokenIdxToMask(newMaskIdx);
+
+      const { tokens: newTokens, numLayers: newLayers } = await handleLoadModel(
+        selectedModel,
+        selectedTask,
+        confirmedSentence,
+        confirmedHypothesis
+      );
+
+      await handlePredict(
+        selectedModel,
+        selectedTask,
+        confirmedSentence,
+        confirmedHypothesis
+      );
+
+      await handleComputeMatrix(
+        selectedModel,
+        selectedTask,
+        confirmedSentence,
+        confirmedHypothesis,
+        newTokens
+      );
+    }}
+    style={{ width: '100%' }}
+  >
+    <option value="">(pick a token to mask)</option>
+    {tokens.map((tok, idx) => {
+      const clean = cleanToken(tok);
+      const unmaskable = ['[SEP]', '[MASK]', '[CLS]', '<s>', '</s>'];
+      if (unmaskable.includes(clean)) return null;
+
+      return (
+        <option key={idx} value={idx}>
+          {idx} {clean}
+        </option>
+      );
+    })}
+  </select>
+</div>
+
 
         
-            
         
 
         </>
         ) : null }
 
+               {/* Load model button */}
+      <button
+        className="uniform-button"
+        onClick={async () => {
+          const { tokens: newTokens, numLayers: newLayers } = await handleLoadModel(
+                selectedModel,
+                selectedTask,
+                confirmedSentence,
+                confirmedHypothesis
+              );
+          await handlePredict(
+            selectedModel,
+            selectedTask,
+            confirmedSentence,
+            confirmedHypothesis
+          );
+
+          await handleComputeMatrix(
+            selectedModel,
+            selectedTask,
+            confirmedSentence, 
+            confirmedHypothesis,
+                newTokens           
+          );
+
+        }}
+        style={{ marginTop: '1rem' }}
+      >
+        Load / Reset Model
+      </button>
+        
         {selectedTask === 'MNLI' && (
         <div style={{ marginBottom: '1rem' }}>
             <label>Hypothesis:</label><br />
@@ -362,9 +452,31 @@ useEffect(() => {
         )}
         {selectedTask === 'MNLI' && (
         <button
-            onClick={() => {
-            handlePredict();
-            onComputeMatrix();
+            onClick={async () => {
+            setConfirmedHypothesis(inputHypothesis); 
+
+            const { tokens: newTokens, numLayers: newLayers } = await handleLoadModel(
+                selectedModel,
+                selectedTask,
+                confirmedSentence,
+                confirmedHypothesis
+              );
+
+            await handlePredict(
+              selectedModel,
+              selectedTask,
+              confirmedSentence,
+              confirmedHypothesis
+            );
+
+            await handleComputeMatrix(
+              selectedModel,
+              selectedTask,
+              confirmedSentence, 
+              confirmedHypothesis,
+                newTokens           
+            );
+
             }}
             className="uniform-button"
             style={{ marginTop: '0.5rem' }}
@@ -373,53 +485,68 @@ useEffect(() => {
         </button>
         )}
 
+          {isRetrievingMatrix && (
+            <div style={{
+              fontStyle: 'italic',
+              fontSize: '12px',
+              color: '#555',
+              marginBottom: '1rem'
+            }}>
+              Retrieving data...
+            </div>
+          )}
 
-{/*modelLoaded && (
-  <>
-<button onClick={handlePredict} style={{ marginBottom: '1rem', marginRight: '1rem' }} className="uniform-button" >
-            Forward prop
-            </button>
-
-    <button onClick={onComputeMatrix} style={{ marginBottom: '1rem' }} className="uniform-button">
-            Backprop
-        </button>
- </>
-)*/}
 
       {/* bar chart */}
-        { predictTokens.length > 0 && predictProbs.length > 0 && (
+      {predictTokens.length > 0 && predictProbs.length > 0 ? (
         <div style={{ marginBottom: '1rem' }}>
-            <h4>Top Predictions</h4>
-            <svg width="100%" height={predictTokens.length * 30}>
+          <h4>Top Predictions</h4>
+          <svg width="100%" height={predictTokens.length * 30}>
             {predictTokens.map((token, i) => (
-                <g key={i} transform={`translate(0, ${i * 30})`}>
+              <g key={i} transform={`translate(0, ${i * 30})`}>
                 <text x="0" y="20" style={{ fontSize: '12px' }}>{cleanToken(token)}</text>
                 <rect
-                    x="60"
-                    y="10"
-                    height="10"
-                    width={`${predictProbs[i] * 200}`}
-                    fill="#3b82f6"
+                  x="60"
+                  y="10"
+                  height="10"
+                  width={`${predictProbs[i] * 200}`}
+                  fill="#3b82f6"
                 />
                 <text x={`${predictProbs[i] * 200 + 65}`} y="20" fontSize="12">
-                    {predictProbs[i].toFixed(2)}
+                  {predictProbs[i].toFixed(2)}
                 </text>
-                </g>
+              </g>
             ))}
-            </svg>
+          </svg>
         </div>
-        )}
+      ) : (
+        <div>
+      
 
-
-      {/* Model info feedback */}
-      {/*
-      {modelInfo && (
-        <div style={{ marginTop: '1rem', fontStyle: 'italic', color: '#333' }}>
-          {modelInfo}
-
+          {/* Model info feedback */}
+          {predictTokens.length === 0 && predictProbs.length === 0 && (
+            <div style={{ marginTop: '1rem', color: '#000' }}>
+              {selectedTask === 'MLM' && tokens.length === 0 && (
+                <>⚠️ To begin, reset your sentence, click <strong>Load Model</strong>, and choose a word to mask.</>
+              )}
+              {selectedTask === 'SST' && tokens.length === 0 && (
+                <>⚠️ To begin, reset your sentence and click <strong>Load Model</strong>.</>
+              )}
+              {selectedTask === 'MNLI' && tokens.length === 0 && (
+                <>⚠️ To begin, reset your sentence, click <strong>Load Model</strong>, and then type and submit a hypothesis.</>
+              )}
+              {!selectedTask && (
+                <>⚠️ Select a task, reset the sentence, and click <strong>Load Model</strong> to get started.</>
+              )}
+            </div>
+          )}
         </div>
-      )}*/}
+      )}
 
-    </div>
+
+
+      </div>
+
+ 
   );
 }

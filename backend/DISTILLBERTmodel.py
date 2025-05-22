@@ -1,8 +1,4 @@
 import torch
-import matplotlib.pyplot as plt
-import torch.nn as nn
-from datasets import load_dataset
-from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
  
@@ -26,7 +22,8 @@ class DistilBERTVisualizer(TransformerVisualizer):
         elif self.task == 'sst':
             self.model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased-finetuned-sst-2-english')
         elif self.task == 'mnli':
-            self.model = DistilBertForSequenceClassification.from_pretrained("ynie/distilbert-base-uncased-snli-mnli-scitail-mednli")
+            self.model = DistilBertForSequenceClassification.from_pretrained("textattack/distilbert-base-uncased-MNLI")
+
 
         else:
             raise NotImplementedError("Task not supported for DistilBERT")
@@ -37,8 +34,18 @@ class DistilBERTVisualizer(TransformerVisualizer):
 
         self.model.to(self.device)
 
-    def tokenize(self, text):
-        encoded = self.tokenizer(text, return_tensors='pt', return_attention_mask=True)
+
+        
+    def tokenize(self, text, hypothesis = ''):
+
+         
+
+        if len(hypothesis) == 0:
+            encoded = self.tokenizer(text, return_tensors='pt', return_attention_mask=True,padding=False, truncation=True)
+        else:
+            encoded = self.tokenizer(text, hypothesis, return_tensors='pt', return_attention_mask=True,padding=False, truncation=True)
+
+
         input_ids = encoded['input_ids'].to(self.device)
         attention_mask = encoded['attention_mask'].to(self.device)
         tokens = self.tokenizer.convert_ids_to_tokens(input_ids[0])
@@ -48,10 +55,16 @@ class DistilBERTVisualizer(TransformerVisualizer):
             'tokens': tokens
         }
      
-    def predict(self, task, text):
+    def predict(self, task, text, hypothesis='', maskID = 0):
+        
         if task  == 'mlm':
-            inputs = self.tokenizer(text, return_tensors='pt', padding=False, truncation=True).to(self.device)
-            mask_index = (inputs['input_ids'][0] == self.tokenizer.mask_token_id).nonzero(as_tuple=True)[0].item()
+            inputs = self.tokenizer(text, return_tensors='pt', padding=False, truncation=True)
+            if maskID is not None and 0 <= maskID < inputs['input_ids'].size(1):
+                inputs['input_ids'][0][maskID] = self.tokenizer.mask_token_id
+                mask_index = maskID
+            else:
+                raise ValueError(f"Invalid maskID {maskID} for input of length {inputs['input_ids'].size(1)}")
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
             with torch.no_grad():
                 outputs = self.model(**inputs)
@@ -72,9 +85,8 @@ class DistilBERTVisualizer(TransformerVisualizer):
 
             labels = ["negative", "positive"]
             return labels, probs
-        elif task == 'mnli':
-            premise, hypothesis = text
-            inputs = self.tokenizer(premise, hypothesis, return_tensors='pt', padding=True, truncation=True).to(self.device)
+        elif task == 'mnli': 
+            inputs = self.tokenizer(text, hypothesis, return_tensors='pt', padding=True, truncation=True).to(self.device)
 
             with torch.no_grad():
                 outputs = self.model(**inputs)
@@ -87,14 +99,24 @@ class DistilBERTVisualizer(TransformerVisualizer):
         else:
             raise NotImplementedError(f"Task '{task}' not supported for DistilBERT")
 
-
-    def get_grad_attn_matrix(self, task, sentence, target_layer):
-        print(task, sentence, target_layer)
-
+    def get_all_grad_attn_matrix(self, task, sentence, hypothesis='', maskID = 0):
+        print(task, sentence,hypothesis) 
 
         print('Tokenize')
-        inputs = self.tokenizer(sentence, return_tensors='pt', padding=False, truncation=True)
+        if task == 'mnli':
+            inputs = self.tokenizer(sentence, hypothesis, return_tensors='pt', padding=False, truncation=True)
+        elif task == 'mlm':
+            inputs = self.tokenizer(sentence,  return_tensors='pt', padding=False, truncation=True)
+            if maskID is not None and 0 <= maskID < inputs['input_ids'].size(1):
+                inputs['input_ids'][0][maskID] = self.tokenizer.mask_token_id
+            else:
+                print(f"Invalid maskID {maskID} for input of length {inputs['input_ids'].size(1)}")
+                raise ValueError(f"Invalid maskID {maskID} for input of length {inputs['input_ids'].size(1)}")
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        else:
+            inputs = self.tokenizer(sentence,  return_tensors='pt', padding=False, truncation=True)
         tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
+        print(tokens)
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
         print('Input embeddings with grad')
@@ -112,6 +134,19 @@ class DistilBERTVisualizer(TransformerVisualizer):
 
         print('Mean attentions per layer')
         mean_attns = [a.squeeze(0).mean(dim=0).detach().cpu() for a in attentions]
+        
+
+        
+        attn_matrices_all = []
+        grad_matrices_all = []
+        for target_layer in range(len(attentions)):
+            grad_matrix, attn_matrix = self.get_grad_attn_matrix(inputs_embeds, attentions, mean_attns, target_layer)
+            grad_matrices_all.append(grad_matrix.tolist())
+            attn_matrices_all.append(attn_matrix.tolist())
+        return grad_matrices_all, attn_matrices_all
+    
+
+    def get_grad_attn_matrix(self,inputs_embeds, attentions, mean_attns, target_layer):
         attn_matrix = mean_attns[target_layer]
         seq_len = attn_matrix.shape[0]
         attn_layer = attentions[target_layer].squeeze(0).mean(dim=0)

@@ -20,7 +20,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # or restrict to ["http://localhost:3000"]
+    allow_origins=["*"],   
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,17 +36,21 @@ class LoadModelRequest(BaseModel):
     model: str
     sentence: str
     task:str
+    hypothesis:str
 
 class GradAttnModelRequest(BaseModel):
     model: str
     task: str
     sentence: str
-    selected_layer: int = -1
+    hypothesis:str
+    maskID: int | None = None
 
 class PredModelRequest(BaseModel):
     model: str
     sentence: str
     task:str
+    hypothesis:str
+    maskID: int | None = None
 
 
 @app.post("/load_model")
@@ -55,6 +59,7 @@ def load_model(req: LoadModelRequest):
     print(f"Model: {req.model}")
     print(f"Sentence: {req.sentence}")
     print(f"Task: {req.task}")
+    print(f"hypothesis: {req.hypothesis}")
 
 
     if req.model in VISUALIZER_CACHE:
@@ -68,6 +73,8 @@ def load_model(req: LoadModelRequest):
     print("instantiating visualizer")
     try:
         vis = vis_class(task=req.task.lower())
+        print(vis)
+        VISUALIZER_CACHE[req.model] = vis
         print("Visualizer instantiated")
     except Exception as e:
         print("Visualizer init failed:", e)
@@ -75,8 +82,11 @@ def load_model(req: LoadModelRequest):
 
     print('tokenizing')
     try:
-        token_output = vis.tokenize(req.sentence)
-        print("Tokenization successful:", token_output["tokens"])
+        if req.task.lower() == 'mnli':
+            token_output = vis.tokenize(req.sentence, hypothesis=req.hypothesis)
+        else:
+            token_output = vis.tokenize(req.sentence)
+        print("0 Tokenization successful:", token_output["tokens"])
     except Exception as e:
         print("Tokenization failed:", e)
         return {"error": f"Tokenization failed: {str(e)}"}
@@ -97,72 +107,106 @@ def load_model(req: LoadModelRequest):
 
 @app.post("/predict_model")
 def predict_model(req: PredModelRequest):
+    
     print(f"\n--- /predict_model request received ---")
-    print(f"Model: {req.model}")
-    print(f"Task: {req.task}")
-    print(f"sentence: {req.sentence}")
+    print(f"predict: Model: {req.model}")
+    print(f"predict: Task: {req.task}")
+    print(f"predict: sentence: {req.sentence}")
+    print(f"predict: hypothesis: {req.hypothesis}")
+    print(f"predict: maskID: {req.maskID}")
 
 
 
-    print('instantiating')
-    vis = VISUALIZER_CACHE.get(req.model)
-    if vis is None:
-        return {"error": f"Model {req.model} is not loaded. Please call /load_model first."}
-    
-    
-    if any(p.device.type == 'meta' for p in vis.model.parameters()):
-        raise RuntimeError("Model is in meta device. Reload it cleanly using /load_model.")
-    
-
-    
-    print('Run prediction')
+    print('predict: instantiating')
     try:
-        decoded, top_probs = vis.predict(req.task.lower(), req.sentence)
+        vis_class = VISUALIZER_CLASSES.get(req.model)
+        if vis_class is None:
+            return {"error": f"Unknown model: {req.model}"}
+        #if any(p.device.type == 'meta' for p in vis.model.parameters()):
+        #    vis.model = torch.nn.Module.to_empty(vis.model, device=torch.device("cpu"))
+    
+        vis = vis_class(task=req.task.lower())
+        VISUALIZER_CACHE[req.model] = vis
+        print("Model reloaded and cached.")
+    except Exception as e:
+        return {"error": f"Failed to reload model: {str(e)}"}
+    
+    print('predict: meta stuff')
+    
+
+    
+    print('predict: Run prediction')
+    try:
+        if req.task.lower() == 'mnli':
+            decoded, top_probs = vis.predict(req.task.lower(), req.sentence, hypothesis=req.hypothesis)
+        elif req.task.lower() == 'mlm':
+            decoded, top_probs = vis.predict(req.task.lower(), req.sentence, maskID=req.maskID)
+        
+        else:
+            decoded, top_probs = vis.predict(req.task.lower(), req.sentence)
     except Exception as e:
         decoded, top_probs = "error", e
         print(e)
 
-    print('response ready')
+    print('predict: response ready')
     response = {
         "decoded": decoded,
         "top_probs": top_probs.tolist(),
     }
-    print("predict model successful")
-    print(response)
+    print("predict: predict model successful")
+    if len(decoded) > 5:
+        print([(k,v[:5]) for k,v in response.items()])
+    else:
+        print(response)
     return response
 
 
 
 @app.post("/get_grad_attn_matrix")
 def get_grad_attn_matrix(req: GradAttnModelRequest):
+    
     try:
         print(f"\n--- /get_grad_matrix request received ---")
-        print(f"Model: {req.model}")
-        print(f"Task: {req.task}")
-        print(f"sentence: {req.sentence}")
-        print(f"Selected layer: {req.selected_layer}")
+        print(f"grad:Model: {req.model}")
+        print(f"grad:Task: {req.task}")
+        print(f"grad:sentence: {req.sentence}")
+        print(f"grad: hypothesis: {req.hypothesis}")
+        print(f"predict: maskID: {req.maskID}")
         
-        if any(p.device.type == 'meta' for p in vis.model.parameters()):
-            raise RuntimeError("Model is in meta device. Reload it cleanly using /load_model.")
-        vis = VISUALIZER_CACHE.get(req.model)
-        if vis is None:
-            return {"error": f"Model {req.model} is not loaded. Please call /load_model first."}
+        
+        
+        try:
+            vis_class = VISUALIZER_CLASSES.get(req.model)
+            if vis_class is None:
+                return {"error": f"Unknown model: {req.model}"}
+            #if any(p.device.type == 'meta' for p in vis.model.parameters()):
+            #    vis.model = torch.nn.Module.to_empty(vis.model, device=torch.device("cpu"))
+            vis = vis_class(task=req.task.lower())
+            VISUALIZER_CACHE[req.model] = vis
+            print("Model reloaded and cached.")
+        except Exception as e:
+            return {"error": f"Failed to reload model: {str(e)}"} 
 
 
         
         print("run function")
         try:
-            grad_matrix, attn_matrix = vis.get_grad_attn_matrix(req.task.lower(), req.sentence, req.selected_layer)
+            if req.task.lower()=='mnli':
+                grad_matrix, attn_matrix = vis.get_all_grad_attn_matrix(req.task.lower(), req.sentence,hypothesis=req.hypothesis)
+            elif req.task.lower()=='mlm':
+                grad_matrix, attn_matrix = vis.get_all_grad_attn_matrix(req.task.lower(), req.sentence,maskID=req.maskID)
+            else:
+                grad_matrix, attn_matrix = vis.get_all_grad_attn_matrix(req.task.lower(), req.sentence)
         except Exception as e:
             print("Exception during grad/attn computation:", e)
             grad_matrix, attn_matrix = e,e
 
     
         response = {
-            "grad_matrix": grad_matrix.tolist(),
-            "attn_matrix": attn_matrix.tolist(),
+            "grad_matrix": grad_matrix,
+            "attn_matrix": attn_matrix,
         }
-        print(response)
+        print('grad attn successful')
         return response
     except Exception as e:
         print("SERVER EXCEPTION:", e)
