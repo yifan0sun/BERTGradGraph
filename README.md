@@ -41,7 +41,7 @@ All predictions are visualized using an interactive bar chart.
 
 ## 📎 Technical Notes
 
-- Backend is written in **FastAPI** and deployed via **Hugging Face Spaces (Docker)**.
+- Backend is written in **FastAPI** and deployed on **Render**.
 - Frontend is built with **React + Vite** and hosted via **GitHub Pages** (`docs/` folder).
 - Uses **Hugging Face Transformers** for all model inference.
 - Visualizations are built using **Plotly.js**.
