@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-const SERVER_ADDRESS = 'https://yifan0sun-bertgradgraph.hf.space';
+//const SERVER_ADDRESS = 'https://yifan0sun-bertgradgraph.hf.space';
 //const SERVER_ADDRESS = 'http://localhost:8000';
+const SERVER_ADDRESS = 'https://bertgradgraph.onrender.com';
+
+
 import '../App.css';
 import { cleanToken } from  '../utils.ts'
 
