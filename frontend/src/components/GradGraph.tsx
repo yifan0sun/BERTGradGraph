@@ -221,7 +221,7 @@ if (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
 
 
-      
+      {/*
         <div
           style={{
             fontSize: '12px',
@@ -240,20 +240,21 @@ if (
           Matrix shape: {matrices[mode]?.[layer - 1]?.length ?? 0} × {matrices[mode]?.[layer - 1]?.[0]?.length ?? 0}
           Matrix shape: {matrices[mode]?.[layer - 1]?.length ?? 0} × {matrices[mode]?.[layer - 1]?.[0]?.length ?? 0}<br /><br />
 
-  <strong>Selected Matrix Sample (first 5×5):</strong>
-{matrices[mode]?.[layer - 1]?.length >= 5 &&
- matrices[mode]?.[layer - 1]?.[0]?.length >= 5 && (
-  <pre style={{ whiteSpace: 'pre-wrap' }}>
-    {matrices[mode][layer - 1]
-      .slice(0, 5)
-      .map((row) =>
-        row.slice(0, 5).map((val) => val.toFixed(2)).join(', ')
-      )
-      .join('\n')}
-  </pre>
-)}
+          <strong>Selected Matrix Sample (first 5×5):</strong>
+        {matrices[mode]?.[layer - 1]?.length >= 5 &&
+        matrices[mode]?.[layer - 1]?.[0]?.length >= 5 && (
+          <pre style={{ whiteSpace: 'pre-wrap' }}>
+            {matrices[mode][layer - 1]
+              .slice(0, 5)
+              .map((row) =>
+                row.slice(0, 5).map((val) => val.toFixed(2)).join(', ')
+              )
+              .join('\n')}
+          </pre>
+        )}
 
         </div>
+        */}
 
 <div style={{ fontSize: '12px', fontFamily: 'monospace', marginBottom: '1rem' }}>
   ✅ Matrices received for layer {layer}:<br />

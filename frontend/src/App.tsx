@@ -37,24 +37,22 @@ const [mode, setMode] = useState<'attention' | 'gradient'>('attention');
       <p>
         Interpretability is key to trust in AI. This tool turns hidden weights into intuitive graphs — helping you explore how models reason through language.
         This tool lets you visualize how transformer models distribute attention and how sensitive their outputs are to each input token.
-        <br /><br />
+        <br />
         - <strong>Attention</strong> shows how much each token attends to others across a given layer.
         <br />
         - <strong>Gradient Norm</strong> captures how much a small change to each input token affects the model’s attention pattern at that specific layer — indicating influence.
-        <br /><br />
-        To use: select a model and task, optionally mask a word (for MLM), and click "Load Model Info" to visualize attention or gradient patterns by layer.
         <br />
+        To use: select a model and task, optionally mask a word (for MLM), and click "Load Model Info" to visualize attention or gradient patterns by layer.
         (We truncate inputs to 200 words to avoid glitches when the input is too long.)
       </p>
-<br />
+
       
-        <p style={{ textAlign: "left" , marginBottom: "0px" }}><b>More.</b> Visit  <a href="https://github.com/yifan0sun/BertGradGraph/blob/main/README.md">the project README file</a></p>
-        <p style={{ textAlign: "left" , marginBottom: "0px" }}><b>Prototype.</b>  Feedback and suggestions are welcome! Please visit <a href="https://sites.google.com/view/visualizerprojects/home">optimalvisualizer.com</a> to give feedback or visit more visually pleasing explainability apps.</p>
+        <p style={{ textAlign: "left" , marginBottom: "0px" }}><b>More.</b> Visit  <a href="https://github.com/yifan0sun/BertGradGraph/blob/main/README.md">the project README file</a>. Feedback and suggestions are welcome! Please visit <a href="https://sites.google.com/view/visualizerprojects/home">optimalvisualizer.com</a> to give feedback or visit more visually pleasing explainability apps.</p>
           
 
     </div>
 
-
+{/*
 
     <div style={{
   fontSize: '12px',
@@ -68,7 +66,7 @@ const [mode, setMode] = useState<'attention' | 'gradient'>('attention');
   Num Layers: {numLayers}<br />
   Matrix shape ({mode}, layer {selectedLayer}): {matrices[mode]?.[selectedLayer - 1]?.length ?? 0} × {matrices[mode]?.[selectedLayer - 1]?.[0]?.length ?? 0}
 </div>
-
+*/}
 
     {/* Main content below the top bar */}
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

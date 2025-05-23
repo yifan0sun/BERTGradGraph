@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-//const SERVER_ADDRESS = 'https://yifan0sun-bertgradgraph.hf.space';
+const SERVER_ADDRESS = 'https://yifan0sun-bertgradgraph.hf.space';
 //const SERVER_ADDRESS = 'http://localhost:8000';
-const SERVER_ADDRESS = 'https://bertgradgraph.onrender.com';
+//const SERVER_ADDRESS = 'https://bertgradgraph.onrender.com';
 
 
 import '../App.css';
@@ -251,7 +251,7 @@ const handleComputeMatrix = async  (
   return (
     <div style={{ width: '300px', padding: '1rem', borderRight: '1px solid #ccc' }}>
 
-
+{/*
 <div style={{
   fontSize: '12px',
   fontFamily: 'monospace',
@@ -265,9 +265,10 @@ const handleComputeMatrix = async  (
   Num Layers: {numLayers ?? 0}<br />
   Matrix shape (attention): {tokens.length > 0 && numLayers ? `${numLayers} × ${tokens.length}` : 'n/a'}<br />
   masked token: {selectedTokenIdxToMask}<br />
-  sentence: {confirmedSentence}
+  sentence: {confirmedSentence}<br />
+  server address: {SERVER_ADDRESS}
 </div>
-
+*/}
 
 
       {/* Sentence input */}
