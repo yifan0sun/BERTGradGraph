@@ -3,6 +3,8 @@
 A web-based tool for visualizing attention and gradient sensitivity in transformer models.
 URL: [yifan0sun.github.io/BERTGradGraph/](https://yifan0sun.github.io/BERTGradGraph/)
 
+**Note**: this particular app really does not work well on tablets or phones. It works best on larger screens.
+
 [Please report glitches on this google form.](https://forms.gle/wvaqSkKpyfseYSSB8) Note that these are all personal projects, and I am poor, so the backend is very slow, so please be patient.
 
 ---
