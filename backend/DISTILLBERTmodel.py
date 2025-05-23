@@ -4,7 +4,6 @@ import torch.nn.functional as F
  
 
 import os
-from transformers import DistilBertModel, DistilBertTokenizer
 from models import TransformerVisualizer
 
 from transformers import (
@@ -12,22 +11,74 @@ from transformers import (
     DistilBertForMaskedLM, DistilBertForSequenceClassification
 )    
 
-CACHE_DIR  = "./hf_cache"
+CACHE_DIR  = "/data/hf_cache"
 class DistilBERTVisualizer(TransformerVisualizer):
     def __init__(self, task):
         super().__init__()
         self.task = task
-        self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased', cache_dir=CACHE_DIR)
-        if self.task == 'mlm':
-            self.model = DistilBertForMaskedLM.from_pretrained('distilbert-base-uncased', cache_dir=CACHE_DIR)
-        elif self.task == 'sst':
-            self.model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased-finetuned-sst-2-english', cache_dir=CACHE_DIR)
-        elif self.task == 'mnli':
-            self.model = DistilBertForSequenceClassification.from_pretrained("textattack/distilbert-base-uncased-MNLI", cache_dir=CACHE_DIR)
 
+        
+        TOKENIZER = 'distilbert-base-uncased'
+        LOCAL_PATH = os.path.join(CACHE_DIR, "tokenizers",TOKENIZER.replace("/", "_"))
+        
+        self.tokenizer = DistilBertTokenizer.from_pretrained(LOCAL_PATH, local_files_only=True)
+        """
+        try:
+            self.tokenizer = DistilBertTokenizer.from_pretrained(LOCAL_PATH, local_files_only=True)
+        except Exception as e:
+            self.tokenizer = DistilBertTokenizer.from_pretrained(TOKENIZER)
+            self.tokenizer.save_pretrained(LOCAL_PATH)
+        """
+
+
+        print('finding model', self.task)
+        if self.task == 'mlm':
+            
+            MODEL = 'distilbert-base-uncased'
+            LOCAL_PATH = os.path.join(CACHE_DIR, "models",MODEL)
+
+            self.model = DistilBertForMaskedLM.from_pretrained(  LOCAL_PATH, local_files_only=True )
+            """
+            try:
+            except Exception as e:
+                self.model = DistilBertForMaskedLM.from_pretrained(  MODEL  )
+                self.model.save_pretrained(LOCAL_PATH)
+            """
+        elif self.task == 'sst':
+            MODEL = 'distilbert-base-uncased-finetuned-sst-2-english'
+            LOCAL_PATH = os.path.join(CACHE_DIR, "models",MODEL)
+
+            self.model = DistilBertForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True )
+            """
+            try:
+                self.model = DistilBertForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True )
+            except Exception as e:
+                self.model = DistilBertForSequenceClassification.from_pretrained(  MODEL )
+                self.model.save_pretrained(LOCAL_PATH)
+            """
+
+        elif self.task == 'mnli':
+            MODEL = "textattack_distilbert-base-uncased-MNLI"
+            LOCAL_PATH = os.path.join(CACHE_DIR, "models",MODEL)
+
+            
+            self.model = DistilBertForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True)
+            """
+            try:
+                self.model = DistilBertForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True)
+            except Exception as e:
+                self.model = DistilBertForSequenceClassification.from_pretrained(  MODEL)
+                self.model.save_pretrained(LOCAL_PATH)
+            """
+
+ 
 
         else:
-            raise NotImplementedError("Task not supported for DistilBERT")
+            raise ValueError(f"Unsupported task: {self.task}")
+        
+
+  
+ 
         
 
         self.model.eval()

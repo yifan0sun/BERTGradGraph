@@ -5,19 +5,70 @@ from models import TransformerVisualizer
 from transformers import (
     RobertaForMaskedLM, RobertaForSequenceClassification
 )
+import os
 
-CACHE_DIR  = "./hf_cache"
+CACHE_DIR  = "/data/hf_cache"
+
 class RoBERTaVisualizer(TransformerVisualizer):
     def __init__(self, task):
         super().__init__()
         self.task = task
-        self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base', cache_dir=CACHE_DIR)
+
+
+        
+        TOKENIZER = 'roberta-base'
+        LOCAL_PATH = os.path.join(CACHE_DIR, "tokenizers",TOKENIZER)
+        
+        self.tokenizer = RobertaTokenizer.from_pretrained(LOCAL_PATH, local_files_only=True)
+        """
+        try:
+            self.tokenizer = RobertaTokenizer.from_pretrained(LOCAL_PATH, local_files_only=True)
+        except Exception as e:
+            self.tokenizer = RobertaTokenizer.from_pretrained(TOKENIZER)
+            self.tokenizer.save_pretrained(LOCAL_PATH)
+        """
         if self.task == 'mlm':
-            self.model = RobertaForMaskedLM.from_pretrained("roberta-base", cache_dir=CACHE_DIR)
+            
+            MODEL = "roberta-base"
+            LOCAL_PATH = os.path.join(CACHE_DIR, "models",MODEL)
+            
+            self.model = RobertaForMaskedLM.from_pretrained(  LOCAL_PATH, local_files_only=True )
+            """
+            try:
+                self.model = RobertaForMaskedLM.from_pretrained(  LOCAL_PATH, local_files_only=True )
+            except Exception as e:
+                self.model = RobertaForMaskedLM.from_pretrained(  MODEL  )
+                self.model.save_pretrained(LOCAL_PATH)
+            """
         elif self.task == 'sst':
-            self.model = RobertaForSequenceClassification.from_pretrained('textattack/roberta-base-SST-2', cache_dir=CACHE_DIR)
+
+            
+            MODEL = 'textattack_roberta-base-SST-2'
+            LOCAL_PATH = os.path.join(CACHE_DIR, "models",MODEL)
+            
+            self.model = RobertaForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True )
+            """
+            try:
+                self.model = RobertaForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True )
+            except Exception as e:
+                self.model = RobertaForSequenceClassification.from_pretrained(  MODEL )
+                self.model.save_pretrained(LOCAL_PATH)
+            """
+
         elif self.task == 'mnli':
-            self.model = RobertaForSequenceClassification.from_pretrained("roberta-large-mnli", cache_dir=CACHE_DIR)
+            MODEL = "roberta-large-mnli"
+            LOCAL_PATH = os.path.join(CACHE_DIR, "models",MODEL)
+
+            
+            self.model = RobertaForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True)
+            """
+            try:
+                self.model = RobertaForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True)
+            except Exception as e:
+                self.model = RobertaForSequenceClassification.from_pretrained(  MODEL)
+                self.model.save_pretrained(LOCAL_PATH)
+            """
+
 
 
         self.model.to(self.device)

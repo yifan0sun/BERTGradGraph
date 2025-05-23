@@ -10,29 +10,80 @@ from transformers import (
     BertForSequenceClassification,
 )
 import torch.nn.functional as F
+import os
 
-
-CACHE_DIR  = "./hf_cache"
+CACHE_DIR  = "/data/hf_cache"
  
     
 class BERTVisualizer(TransformerVisualizer):
     def __init__(self,task):
         super().__init__()  
         self.task = task
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', cache_dir=CACHE_DIR)
+        print(task,'BERT VIS START')
+
+        TOKENIZER = 'bert-base-uncased'
+        LOCAL_PATH = os.path.join(CACHE_DIR, "tokenizers",TOKENIZER)
+        
+
+        self.tokenizer = BertTokenizer.from_pretrained(LOCAL_PATH, local_files_only=True)
+        """
+        try:
+            self.tokenizer = BertTokenizer.from_pretrained(LOCAL_PATH, local_files_only=True)
+        except Exception as e:
+            self.tokenizer = BertTokenizer.from_pretrained(TOKENIZER)
+            self.tokenizer.save_pretrained(LOCAL_PATH)
+        """
+
+
         print('finding model', self.task)
         if self.task == 'mlm':
-            self.model = BertForMaskedLM.from_pretrained(
-                "bert-base-uncased",
-                attn_implementation="eager",  # fallback to standard attention
-                cache_dir=CACHE_DIR
-            ).to(self.device)
+            
+            MODEL = 'bert-base-uncased'
+            LOCAL_PATH = os.path.join(CACHE_DIR, "models",MODEL)
+            
+            self.model = BertForMaskedLM.from_pretrained(  LOCAL_PATH, local_files_only=True,   attn_implementation="eager" ).to(self.device)
+            """
+            try:
+                self.model = BertForMaskedLM.from_pretrained(  LOCAL_PATH, local_files_only=True,   attn_implementation="eager" ).to(self.device)
+            except Exception as e:
+                self.model = BertForMaskedLM.from_pretrained(  MODEL,    attn_implementation="eager" ).to(self.device)
+                self.model.save_pretrained(LOCAL_PATH)
+            """
         elif self.task == 'sst':
-            self.model = BertForSequenceClassification.from_pretrained("textattack/bert-base-uncased-SST-2",device_map=None, cache_dir=CACHE_DIR)
+            MODEL = "textattack_bert-base-uncased-SST-2"
+            LOCAL_PATH = os.path.join(CACHE_DIR, "models",MODEL)
+
+            self.model = BertForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True,  device_map=None )
+            """
+            try:
+                self.model = BertForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True,  device_map=None )
+            except Exception as e:
+                self.model = BertForSequenceClassification.from_pretrained(  MODEL,    device_map=None )
+                self.model.save_pretrained(LOCAL_PATH)
+            """
+
         elif self.task == 'mnli':
-            self.model = BertForSequenceClassification.from_pretrained("textattack/bert-base-uncased-MNLI", device_map=None, cache_dir=CACHE_DIR)
+            MODEL = 'textattack_bert-base-uncased-MNLI'
+
+            
+            LOCAL_PATH = os.path.join(CACHE_DIR, "models",MODEL)
+
+            self.model = BertForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True,  device_map=None )
+            """
+            try:
+                self.model = BertForSequenceClassification.from_pretrained(  LOCAL_PATH, local_files_only=True,  device_map=None )
+            except Exception as e:
+                self.model = BertForSequenceClassification.from_pretrained(  MODEL,    device_map=None)
+                self.model.save_pretrained(LOCAL_PATH)
+            """
+
+ 
+
         else:
             raise ValueError(f"Unsupported task: {self.task}")
+        
+
+        
         print('model found')
         #self.model.to(self.device)
         print('self device junk')
