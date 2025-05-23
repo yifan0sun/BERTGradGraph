@@ -37,7 +37,7 @@ The tool displays model predictions for the selected task:
 - **SST**: shows sentiment classification scores (e.g., positive vs. negative).
 - **MNLI**: shows the model’s confidence scores for entailment, neutrality, or contradiction between the premise and hypothesis.
 
-All predictions are visualized using an interactive bar chart.
+All predictions are visualized using an interactive bar chart. To make the lines more salient, the width is proportional to the square of the gradnorm or attention value.
 
 ---
 
