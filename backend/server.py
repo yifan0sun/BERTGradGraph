@@ -1,13 +1,22 @@
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
+from pathlib import Path
 
 import torch
-
+from fastapi import UploadFile, File
+import os
 from fastapi.middleware.cors import CORSMiddleware
 
 from ROBERTAmodel import *
 from BERTmodel import *
 from DISTILLBERTmodel import *
+
+import os
+import zipfile
+import shutil
+from fastapi import Form
+from fastapi import UploadFile, File, Form
+from pathlib import Path
 
 VISUALIZER_CLASSES = {
     "BERT": BERTVisualizer,
@@ -51,11 +60,7 @@ class PredModelRequest(BaseModel):
     task:str
     hypothesis:str
     maskID: int | None = None
-
-@app.get("/ping")
-def ping():
-    return {"message": "pong"}
-
+ 
  
 
 @app.post("/upload_model")
@@ -227,6 +232,103 @@ def get_grad_attn_matrix(req: GradAttnModelRequest):
         print("SERVER EXCEPTION:", e)
         return {"error": str(e)}
     
+
+
+
+
+
+
+
+
+##################################################
+
+
+
+@app.get("/ping")
+def ping():
+    return {"message": "pong"}
+
+    
+
+@app.post("/upload_to_path")
+async def upload_to_path(
+    file: UploadFile = File(...),
+    dest_path: str = Form(...)  # e.g., "models/model.pt"
+):
+    full_path = Path("/data") / dest_path
+    full_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(full_path, "wb") as f:
+        f.write(await file.read())
+
+    return {"status": "uploaded", "path": str(full_path)}
+
+
+
+
+@app.post("/make_dir")
+def make_directory(
+    dir_path: str = Form(...)  # e.g., "logs/test_run"
+):
+    full_dir = Path("/data") / dir_path
+    full_dir.mkdir(parents=True, exist_ok=True)
+    return {"status": "created", "directory": str(full_dir)}
+
+
+
+@app.get("/list_data")
+def list_data():
+    base_path = Path("/data")
+    all_items = []
+
+    for path in base_path.rglob("*"):  # recursive glob
+        all_items.append({
+            "path": str(path.relative_to(base_path)),
+            "type": "dir" if path.is_dir() else "file",
+            "size": path.stat().st_size if path.is_file() else None
+        })
+
+    return {"items": all_items}
+
+
+
+
+
+
+
+
+@app.post("/purge_data_123456789")
+def purge_data():
+    base_path = Path("/data")
+    if not base_path.exists():
+        return {"status": "error", "message": "/data does not exist"}
+
+    deleted = []
+
+    for child in base_path.iterdir():
+        try:
+            if child.is_file() or child.is_symlink():
+                child.unlink()
+            elif child.is_dir():
+                shutil.rmtree(child)
+            deleted.append(str(child.name))
+        except Exception as e:
+            deleted.append(f"FAILED: {child.name} ({e})")
+
+    return {
+        "status": "done",
+        "deleted": deleted,
+        "total": len(deleted)
+    }
+
+
+
+
+
+
+
+
+
 """
 if __name__ == "__main__":
      
