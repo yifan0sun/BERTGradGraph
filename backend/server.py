@@ -18,6 +18,13 @@ from fastapi import Form
 from fastapi import UploadFile, File, Form
 from pathlib import Path
 
+# uvicorn server:app --host 0.0.0.0 --port 7860 --reload
+
+#localhost version
+# python -m uvicorn server:app --host 127.0.0.1 --port 8000 --reload
+
+
+
 VISUALIZER_CLASSES = {
     "BERT": BERTVisualizer,
     "RoBERTa": RoBERTaVisualizer,
@@ -296,7 +303,7 @@ def list_data():
 
 
 
-
+"""
 @app.post("/purge_data_123456789")
 def purge_data():
     base_path = Path("/data")
@@ -324,7 +331,7 @@ def purge_data():
 
 
 
-
+"""
 
 
 
@@ -347,3 +354,4 @@ if __name__ == "__main__":
     DistilBERTVisualizer('mnli')
     DistilBERTVisualizer('sst')
 """
+ 

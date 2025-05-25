@@ -5,7 +5,13 @@ import torch
 
 class TransformerVisualizer():
     def __init__(self):
-        self.device = torch.device('cpu')
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
+
+        
+
+
+
         
     def predict(self, task, text):
         return task, text,1

@@ -10,7 +10,7 @@ from transformers import (
     BertForSequenceClassification,
 )
 import torch.nn.functional as F
-import os
+import os, time
 
 CACHE_DIR  = "/data/hf_cache"
  
@@ -206,55 +206,49 @@ class BERTVisualizer(TransformerVisualizer):
             inputs_embeds=inputs_embeds,
             attention_mask=inputs["attention_mask"],
             output_attentions=True
-        )
+        ) 
+ 
         attentions = outputs.attentions  # list of [1, heads, seq, seq]
 
-        print('Optional: store average attentions per layer')
+        print('Average attentions per layer')
         mean_attns = [a.squeeze(0).mean(dim=0).detach().cpu() for a in attentions]
 
+
+        def scalar_outputs(inputs_embeds):
+
+            outputs = self.model.bert(
+                inputs_embeds=inputs_embeds,
+                attention_mask=inputs["attention_mask"],
+                output_attentions=True
+            )
+            attentions = outputs.attentions
+            attentions_condensed = [a.mean(dim=0).mean(dim=0).sum(dim=0) for a in attentions]
+            attentions_condensed= torch.vstack(attentions_condensed)
+            return attentions_condensed
+    
+        start = time.time()
+        jac = torch.autograd.functional.jacobian(scalar_outputs, inputs_embeds).to(torch.float16)
+        print('time to get jacobian: ', time.time()-start)
+        jac = jac.norm(dim=-1).squeeze(dim=2)
+        seq_len = jac.shape[0]
+        grad_matrices_all = [jac[ii,:,:].tolist() for ii in range(seq_len)]
+
+       
         attn_matrices_all = []
-        grad_matrices_all = []
         for target_layer in range(len(attentions)):
-            grad_matrix, attn_matrix = self.get_grad_attn_matrix(inputs_embeds, attentions, mean_attns, target_layer)
-            grad_matrices_all.append(grad_matrix.tolist())
+            #grad_matrix, attn_matrix = self.get_grad_attn_matrix(inputs_embeds, attentions, mean_attns, target_layer)
+            
+            attn_matrix = mean_attns[target_layer]
+            seq_len = attn_matrix.shape[0]
+            attn_matrix = attn_matrix[:seq_len, :seq_len]
             attn_matrices_all.append(attn_matrix.tolist())
-        return grad_matrices_all, attn_matrices_all
 
-    def get_grad_attn_matrix(self,inputs_embeds, attentions, mean_attns, target_layer):
-         
-        
-        attn_matrix = mean_attns[target_layer] 
-        seq_len = attn_matrix.shape[0]
-        attn_layer = attentions[target_layer].squeeze(0).mean(dim=0)  # [seq, seq]
-
-
-        print('computing gradnorms now')
-        
-
-        grad_norms_list = []
-
-        for k in range(seq_len):
-            scalar = attn_layer[:, k].sum()  # ✅ total attention received by token k
-            
-            # Compute gradient: d scalar / d inputs_embeds
-            
-            grad = torch.autograd.grad(scalar, inputs_embeds, retain_graph=True)[0].squeeze(0)  # shape: [seq, hidden]
-            
-            grad_norms = grad.norm(dim=1)  # shape: [seq]
-            
-            grad_norms_list.append(grad_norms.unsqueeze(1))  # shape: [seq, 1]
-        
-        
-        grad_matrix = torch.cat(grad_norms_list, dim=1)  # shape: [seq, seq]
-        print('ready to send!')
-     
-        grad_matrix = grad_matrix[:seq_len, :seq_len]
-        attn_matrix = attn_matrix[:seq_len, :seq_len]
-
-        #tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
-        
-        return grad_matrix, attn_matrix
  
+ 
+        return grad_matrices_all, attn_matrices_all
+    
+
+
 
 if __name__ == "__main__":
     import sys

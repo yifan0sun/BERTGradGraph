@@ -3,7 +3,7 @@ import torch.nn.functional as F
 
  
 
-import os
+import os, time
 from models import TransformerVisualizer
 
 from transformers import (
@@ -81,10 +81,15 @@ class DistilBERTVisualizer(TransformerVisualizer):
  
         
 
+        self.model.to(self.device)
+        # Force materialization of all layers (avoids meta device errors)
+        with torch.no_grad():
+            dummy_ids = torch.tensor([[0, 1]], device=self.device)
+            dummy_mask = torch.tensor([[1, 1]], device=self.device)
+            _ = self.model(input_ids=dummy_ids, attention_mask=dummy_mask)
         self.model.eval()
         self.num_attention_layers = len(self.model.distilbert.transformer.layer)
 
-        self.model.to(self.device)
 
 
         
@@ -173,7 +178,7 @@ class DistilBERTVisualizer(TransformerVisualizer):
 
         print('Input embeddings with grad')
         embedding_layer = self.model.distilbert.embeddings.word_embeddings
-        inputs_embeds = embedding_layer(inputs["input_ids"])
+        inputs_embeds = embedding_layer(inputs["input_ids"]).to(self.device)
         inputs_embeds.requires_grad_()
 
         print('Forward pass')
@@ -182,42 +187,50 @@ class DistilBERTVisualizer(TransformerVisualizer):
             attention_mask=inputs["attention_mask"],
             output_attentions=True,
         )
+
         attentions = outputs.attentions  # list of [1, heads, seq, seq]
 
-        print('Mean attentions per layer')
+        print('Average attentions per layer')
         mean_attns = [a.squeeze(0).mean(dim=0).detach().cpu() for a in attentions]
-        
 
-        
-        attn_matrices_all = []
-        grad_matrices_all = []
-        for target_layer in range(len(attentions)):
-            grad_matrix, attn_matrix = self.get_grad_attn_matrix(inputs_embeds, attentions, mean_attns, target_layer)
-            grad_matrices_all.append(grad_matrix.tolist())
-            attn_matrices_all.append(attn_matrix.tolist())
-        return grad_matrices_all, attn_matrices_all
+
+        def scalar_outputs(inputs_embeds):
+
+            outputs = self.model.distilbert(
+                inputs_embeds=inputs_embeds,
+                attention_mask=inputs["attention_mask"],
+                output_attentions=True
+            )
+            attentions = outputs.attentions
+            attentions_condensed = [a.mean(dim=0).mean(dim=0).sum(dim=0) for a in attentions]
+            attentions_condensed= torch.vstack(attentions_condensed)
+            return attentions_condensed
     
+        start = time.time()
+        jac = torch.autograd.functional.jacobian(scalar_outputs, inputs_embeds).to(torch.float16)
+        print('time to get jacobian: ', time.time()-start)
+        jac = jac.norm(dim=-1).squeeze(dim=2)
+        seq_len = jac.shape[0]
+        grad_matrices_all = [jac[ii,:,:].tolist() for ii in range(seq_len)]
 
-    def get_grad_attn_matrix(self,inputs_embeds, attentions, mean_attns, target_layer):
-        attn_matrix = mean_attns[target_layer]
-        seq_len = attn_matrix.shape[0]
-        attn_layer = attentions[target_layer].squeeze(0).mean(dim=0)
+       
+        attn_matrices_all = []
+        for target_layer in range(len(attentions)):
+            #grad_matrix, attn_matrix = self.get_grad_attn_matrix(inputs_embeds, attentions, mean_attns, target_layer)
+            
+            attn_matrix = mean_attns[target_layer]
+            seq_len = attn_matrix.shape[0]
+            attn_matrix = attn_matrix[:seq_len, :seq_len]
+            attn_matrices_all.append(attn_matrix.tolist())
 
-        print('Computing grad norms')
-        grad_norms_list = []
-        for k in range(seq_len):
-            scalar = attn_layer[:, k].sum()
-            grad = torch.autograd.grad(scalar, inputs_embeds, retain_graph=True)[0].squeeze(0)
-            grad_norms = grad.norm(dim=1)
-            grad_norms_list.append(grad_norms.unsqueeze(1))
-
-        grad_matrix = torch.cat(grad_norms_list, dim=1)
-        grad_matrix = grad_matrix[:seq_len, :seq_len]
-        attn_matrix = attn_matrix[:seq_len, :seq_len]
-
-        return grad_matrix, attn_matrix
+ 
+ 
+        return grad_matrices_all, attn_matrices_all
+     
 
 
+
+ 
 
 if __name__ == "__main__":
     import sys

@@ -5,9 +5,12 @@ from models import TransformerVisualizer
 from transformers import (
     RobertaForMaskedLM, RobertaForSequenceClassification
 )
-import os
+import os,time
+import torch.autograd.functional as Fgrad
 
 CACHE_DIR  = "/data/hf_cache"
+
+
 
 class RoBERTaVisualizer(TransformerVisualizer):
     def __init__(self, task):
@@ -72,6 +75,12 @@ class RoBERTaVisualizer(TransformerVisualizer):
 
 
         self.model.to(self.device)
+        # Force materialization of all layers (avoids meta device errors)
+        with torch.no_grad():
+            dummy_ids = torch.tensor([[0, 1]], device=self.device)
+            dummy_mask = torch.tensor([[1, 1]], device=self.device)
+            _ = self.model(input_ids=dummy_ids, attention_mask=dummy_mask)
+
         self.model.eval()
         self.num_attention_layers = self.model.config.num_hidden_layers
 
@@ -172,36 +181,97 @@ class RoBERTaVisualizer(TransformerVisualizer):
             attention_mask=inputs["attention_mask"],
             output_attentions=True
         )
+
+
+
+
+
         attentions = outputs.attentions  # list of [1, heads, seq, seq]
 
         print('Average attentions per layer')
         mean_attns = [a.squeeze(0).mean(dim=0).detach().cpu() for a in attentions]
 
+
+        
+
+        def scalar_outputs(inputs_embeds):
+
+            outputs = self.model.roberta(
+                inputs_embeds=inputs_embeds,
+                attention_mask=inputs["attention_mask"],
+                output_attentions=True
+            )
+            attentions = outputs.attentions
+            attentions_condensed = [a.mean(dim=0).mean(dim=0).sum(dim=0) for a in attentions]
+            attentions_condensed= torch.vstack(attentions_condensed)
+            return attentions_condensed
+    
+        start = time.time()
+        jac = torch.autograd.functional.jacobian(scalar_outputs, inputs_embeds).to(torch.float16)
+        print(jac.shape)
+        jac = jac.norm(dim=-1).squeeze(dim=2)
+        print(jac.shape)
+        seq_len = jac.shape[0]
+        print(seq_len)
+        grad_matrices_all = [jac[ii,:,:].tolist() for ii in range(seq_len)]
+
+        print(31,time.time()-start)
+        attn_matrices_all = []
+        for target_layer in range(len(attentions)):
+            #grad_matrix, attn_matrix = self.get_grad_attn_matrix(inputs_embeds, attentions, mean_attns, target_layer)
+            
+            attn_matrix = mean_attns[target_layer]
+            seq_len = attn_matrix.shape[0]
+            attn_matrix = attn_matrix[:seq_len, :seq_len]
+            print(4,attn_matrix.shape)
+            attn_matrices_all.append(attn_matrix.tolist())
+
+        print(3,time.time()-start)
+ 
+
+
+        """
+
         attn_matrices_all = []
         grad_matrices_all = []
         for target_layer in range(len(attentions)):
-            grad_matrix, attn_matrix = self.get_grad_attn_matrix(inputs_embeds, attentions, mean_attns, target_layer)
-            grad_matrices_all.append(grad_matrix.tolist())
+            #grad_matrix, attn_matrix = self.get_grad_attn_matrix(inputs_embeds, attentions, mean_attns, target_layer)
+            
+            attn_matrix = mean_attns[target_layer]
+            seq_len = attn_matrix.shape[0]
+            attn_matrix = attn_matrix[:seq_len, :seq_len]
             attn_matrices_all.append(attn_matrix.tolist())
+
+
+            
+            start = time.time()
+            def scalar_outputs(inputs_embeds):
+
+                outputs = self.model.roberta(
+                    inputs_embeds=inputs_embeds,
+                    attention_mask=inputs["attention_mask"],
+                    output_attentions=True
+                )
+                attentions = outputs.attentions  
+                return attentions[target_layer].mean(dim=0).mean(dim=0).sum(dim=0)
+        
+            jac = torch.autograd.functional.jacobian(scalar_outputs, inputs_embeds).norm(dim=-1).squeeze(1)
+            
+            grad_matrices_all.append(jac.tolist())
+            print(1,time.time()-start)
+            
+            
+            start = time.time()
+            grad_norms_list = []
+            scalar_layer = attentions[target_layer].mean(dim=0).mean(dim=0)
+            for k in range(seq_len):
+                scalar = scalar_layer[:, k].sum()
+                grad = torch.autograd.grad(scalar, inputs_embeds, retain_graph=True)[0].squeeze(0)
+                
+                grad_norms = grad.norm(dim=1)
+                grad_norms_list.append(grad_norms.unsqueeze(1))
+            print(2,time.time()-start)
+        """
+        #print(grad_matrices_all)
         return grad_matrices_all, attn_matrices_all
-    
-    def get_grad_attn_matrix(self,inputs_embeds, attentions, mean_attns, target_layer):
-        
-        attn_matrix = mean_attns[target_layer]
-        seq_len = attn_matrix.shape[0]
-        attn_layer = attentions[target_layer].squeeze(0).mean(dim=0)  # [seq, seq]
-
-        print('Computing grad norms')
-        grad_norms_list = []
-        for k in range(seq_len):
-            scalar = attn_layer[:, k].sum()
-            grad = torch.autograd.grad(scalar, inputs_embeds, retain_graph=True)[0].squeeze(0)
-            grad_norms = grad.norm(dim=1)
-            grad_norms_list.append(grad_norms.unsqueeze(1))
-
-        grad_matrix = torch.cat(grad_norms_list, dim=1)
-        grad_matrix = grad_matrix[:seq_len, :seq_len]
-        attn_matrix = attn_matrix[:seq_len, :seq_len]
-
-        
-        return grad_matrix, attn_matrix
+     
