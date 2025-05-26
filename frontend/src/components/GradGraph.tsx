@@ -254,14 +254,14 @@ if (
         )}
 
         </div>
-        */}
+        
 
 <div style={{ fontSize: '12px', fontFamily: 'monospace', marginBottom: '1rem' }}>
   ✅ Matrices received for layer {layer}:<br />
   - Attention: {matrices.attention?.[layer - 1]?.length ?? 0} × {matrices.attention?.[layer - 1]?.[0]?.length ?? 0}<br />
   - Gradient: {matrices.gradient?.[layer - 1]?.length ?? 0} × {matrices.gradient?.[layer - 1]?.[0]?.length ?? 0}
 </div>
-
+*/}
  
 
 

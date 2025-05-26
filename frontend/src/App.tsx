@@ -2,7 +2,7 @@ import React, { useState } from 'react';
  import { LeftPanel } from './components/LeftPanel';
 import { BottomPanel } from './components/BottomPanel';
 import './App.css';
- 
+ import { AboutPage } from './components/about'; // Assuming you put it here
 
 import { GraphGrad } from './components/GradGraph';
  
@@ -19,6 +19,7 @@ const [matrices, setMatrices] = useState<{
 
 
 
+const [showAbout, setShowAbout] = useState(false);
 
 
   const [tokens, setTokens] = useState<string[]>([]);
@@ -27,7 +28,9 @@ const [selectedLayer, setSelectedLayer] = useState(1);
 const [mode, setMode] = useState<'attention' | 'gradient'>('attention');
 
  
- 
+ if (showAbout) {
+  return <AboutPage onBack={() => setShowAbout(false)} />;
+}
 
   return (
   <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -47,8 +50,20 @@ const [mode, setMode] = useState<'attention' | 'gradient'>('attention');
       </p>
 
       
-        <p style={{ textAlign: "left" , marginBottom: "0px" }}><b>More.</b> Visit  <a href="https://github.com/yifan0sun/BertGradGraph/blob/main/README.md">the project README file</a>. Feedback and suggestions are welcome! Please visit <a href="https://sites.google.com/view/visualizerprojects/home">optimalvisualizer.com</a> to give feedback or visit more visually pleasing explainability apps.</p>
+        <p style={{ textAlign: "left" , marginBottom: "0px" }}><b>More.</b> 
+        <button
+  onClick={() => setShowAbout(true)}
+  style={{
+    fontSize: '12px',
+    padding: '2px 6px',
+    marginTop: '8px',
+    cursor: 'pointer'
+  }}
+>
+  About this tool
+</button> Also, visit  <a href="https://github.com/yifan0sun/BertGradGraph/blob/main/README.md">the project README file</a>. Feedback and suggestions are welcome! Please visit <a href="https://sites.google.com/view/visualizerprojects/home">optimalvisualizer.com</a> to give feedback or visit more visually pleasing explainability apps.</p>
           
+
 
     </div>
 
